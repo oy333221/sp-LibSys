@@ -6,11 +6,11 @@ import qrcode
 from io import BytesIO
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))  # 從環境變數讀取，或生成隨機值
 
-# Supabase 連線
-supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
+# Supabase 連線（從環境變數讀取）
+supabase_url = os.getenv('SUPABASE_URL')
+supabase_key = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
 
 # 生成 QR Code 函數
@@ -125,7 +125,7 @@ def show_qr(action):
         return redirect(url_for('login'))
     user = supabase.table('users').select('bag_id').eq('id', session['user_id']).execute().data[0]
     bag_id = user['bag_id']
-    qr_data = f"{action}:{bag_id}"  # 例如 "borrow:BAG_user_1234" 或 "return:BAG_user_1234"
+    qr_data = f"{action}:{bag_id}"
     qr_img = generate_qr_code(qr_data)
     return send_file(qr_img, mimetype='image/png')
 
@@ -137,18 +137,14 @@ def return_book():
     user_id = session['user_id']
 
     if request.method == 'POST':
-        book_ids = request.form.getlist('book_ids')  # 用戶勾選要還的書
+        book_ids = request.form.getlist('book_ids')
         for book_id in book_ids:
-            # 檢查是否有此預約
             reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).execute().data
             if reservation and reservation[0]['status'] in ['pending', 'picked_up']:
-                # 更新預約狀態為已還
                 supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
-                # 更新書籍狀態為可借
                 supabase.table('publications').update({'status': 'available'}).eq('id', book_id).execute()
         return redirect(url_for('index'))
 
-    # 顯示用戶當前借閱的書籍
     borrowed_books = supabase.table('reservations')\
         .select('publication_id, publications(title, author, isbn)')\
         .eq('user_id', user_id)\
@@ -157,4 +153,6 @@ def return_book():
     return render_template('return.html', borrowed_books=borrowed_books)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Render 環境使用 0.0.0.0 和環境變數 PORT
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
