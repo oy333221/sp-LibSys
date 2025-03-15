@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>還書</title>
+</head>
+<body>
+    <h1>還書</h1>
+    {% if session.user_id %}
+        <p>已登入，歡迎！ <a href="{{ url_for('logout') }}">登出</a></p>
+    {% else %}
+        <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
+    {% endif %}
+
+    <h2>您當前借閱的書籍</h2>
+    {% if borrowed_books %}
+        <form method="POST" action="{{ url_for('return_book') }}">
+            <table border="1">
+                <tr>
+                    <th>書名</th>
+                    <th>作者</th>
+                    <th>ISBN</th>
+                    <th>選擇</th>
+                </tr>
+                {% for book in borrowed_books %}
+                    <tr>
+                        <td>{{ book.publications.title }}</td>
+                        <td>{{ book.publications.author }}</td>
+                        <td>{{ book.publications.isbn }}</td>
+                        <td><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"></td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <button type="submit">確認還書</button>
+        </form>
+    {% else %}
+        <p>您目前沒有借閱任何書籍。</p>
+    {% endif %}
+
+    <a href="{{ url_for('index') }}">回到首頁</a>
+</body>
+</html>

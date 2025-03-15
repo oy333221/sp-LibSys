@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>書籍借閱系統</title>
+</head>
+<body>
+    <h1>歡迎使用書籍借閱系統</h1>
+    {% if session.user_id %}
+        <p>已登入，歡迎！ 
+            <a href="{{ url_for('logout') }}">登出</a> | 
+            <a href="{{ url_for('show_qr', action='borrow') }}">借書 QR Code</a> | 
+            <a href="{{ url_for('show_qr', action='return') }}">還書 QR Code</a> | 
+            <a href="{{ url_for('return_book') }}">還書</a>
+        </p>
+    {% else %}
+        <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
+    {% endif %}
+
+    <p>以下是可借書籍清單：</p>
+    {% if books %}
+        <table border="1">
+            <tr>
+                <th>書名</th>
+                <th>作者</th>
+                <th>ISBN</th>
+                <th>描述</th>
+                <th>操作</th>
+            </tr>
+            {% for book in books %}
+                <tr>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td>{{ book.isbn }}</td>
+                    <td>{{ book.description or '無描述' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('borrow', book_id=book.id) }}">
+                            <button type="submit">借書</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>目前沒有可借的書籍。</p>
+    {% endif %}
+
+    <a href="{{ url_for('register') }}">前往註冊</a><br>
+    <a href="{{ url_for('add_book') }}">新增書籍</a>
+</body>
+</html>

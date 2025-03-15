@@ -1,0 +1,4 @@
+cd C:\Users\User\SPs\sp-LibSys
+virtualenv venv
+
+venv\Scripts\activate     # Windows

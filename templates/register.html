@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>註冊</title>
+</head>
+<body>
+    <h1>用戶註冊</h1>
+    <form method="POST" action="{{ url_for('register') }}">
+        <label>信箱:</label>
+        <input type="email" name="email" required><br>
+        <label>密碼:</label>
+        <input type="password" name="password" required><br>
+        <button type="submit">註冊</button>
+	<a href="{{ url_for('login') }}">已有帳號？登入</a>
+    </form>
+    <a href="{{ url_for('index') }}">回到首頁</a>
+</body>
+</html>

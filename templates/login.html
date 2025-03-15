@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>登入</title>
+</head>
+<body>
+    <h1>用戶登入</h1>
+    <form method="POST" action="{{ url_for('login') }}">
+        <label>信箱:</label>
+        <input type="email" name="email" required><br>
+        <label>密碼:</label>
+        <input type="password" name="password" required><br>
+        <button type="submit">登入</button>
+    </form>
+    <a href="{{ url_for('index') }}">回到首頁</a>
+</body>
+</html>
