@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>審核註冊</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="card">
+        <h1>審核註冊申請</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: green;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% if pending_users %}
+            <table>
+                <tr>
+                    <th>信箱</th>
+                    <th>書袋號碼</th>
+                    <th>操作</th>
+                </tr>
+                {% for user in pending_users %}
+                    <tr>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.bag_id }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin_review') }}">
+                                <input type="hidden" name="user_id" value="{{ user.id }}">
+                                <button type="submit" name="action" value="approve">通過</button>
+                                <button type="submit" name="action" value="reject">拒絕</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <p>目前沒有待審核的申請。</p>
+        {% endif %}
+        <a href="{{ url_for('index') }}">回到首頁</a>
+    </div>
+</body>
+</html>

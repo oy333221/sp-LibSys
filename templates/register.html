@@ -2,17 +2,48 @@
 <html>
 <head>
     <title>註冊</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <h1>用戶註冊</h1>
-    <form method="POST" action="{{ url_for('register') }}">
-        <label>信箱:</label>
-        <input type="email" name="email" required><br>
-        <label>密碼:</label>
-        <input type="password" name="password" required><br>
-        <button type="submit">註冊</button>
-	<a href="{{ url_for('login') }}">已有帳號？登入</a>
-    </form>
-    <a href="{{ url_for('index') }}">回到首頁</a>
+    <div class="card">
+        <h1>用戶註冊</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: green;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('register') }}">
+            <label>信箱:</label>
+            <input type="email" name="email" required>
+            <label>密碼:</label>
+            <input type="password" name="password" required>
+            <label>提供的書籍 ISBN（可多本）:</label>
+            <div id="isbn-fields">
+                <input type="text" name="isbn" placeholder="ISBN">
+                <input type="text" name="title_{{ request.form.get('isbn') }}" placeholder="書名">
+                <input type="text" name="author_{{ request.form.get('isbn') }}" placeholder="作者"><br>
+            </div>
+            <button type="button" onclick="addIsbnField()">新增一本書</button>
+            <input type="submit" value="提交註冊">
+        </form>
+        <a href="{{ url_for('login') }}">已有帳號？登入</a>
+    </div>
+
+    <script>
+        function addIsbnField() {
+            const container = document.getElementById('isbn-fields');
+            const newFields = document.createElement('div');
+            newFields.innerHTML = `
+                <input type="text" name="isbn" placeholder="ISBN">
+                <input type="text" name="title_${Date.now()}" placeholder="書名">
+                <input type="text" name="author_${Date.now()}" placeholder="作者"><br>
+            `;
+            container.appendChild(newFields);
+        }
+    </script>
 </body>
 </html>

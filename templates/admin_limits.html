@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>設定借書上限</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="card">
+        <h1>設定借書上限</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: green;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% if users %}
+            <table>
+                <tr>
+                    <th>信箱</th>
+                    <th>當前上限</th>
+                    <th>新上限</th>
+                    <th>操作</th>
+                </tr>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.max_borrow }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin_limits') }}">
+                                <input type="hidden" name="user_id" value="{{ user.id }}">
+                                <input type="number" name="max_borrow" min="1" value="{{ user.max_borrow }}" required>
+                                <button type="submit">更新</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <p>目前沒有用戶。</p>
+        {% endif %}
+        <a href="{{ url_for('index') }}">回到首頁</a>
+    </div>
+</body>
+</html>

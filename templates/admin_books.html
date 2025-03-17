@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>書籍狀態</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="card">
+        <h1>書籍狀態</h1>
+        {% if books %}
+            <table>
+                <tr>
+                    <th>書名</th>
+                    <th>ISBN</th>
+                    <th>狀態</th>
+                    <th>提供者</th>
+                    <th>借閱者</th>
+                </tr>
+                {% for book in books %}
+                    <tr>
+                        <td>{{ book.title }}</td>
+                        <td>{{ book.isbn }}</td>
+                        <td>{{ book.status }}</td>
+                        <td>{{ book.owner_email }}</td>
+                        <td>{{ book.reservations[0].borrower_email if book.reservations else '無' }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <p>目前沒有書籍。</p>
+        {% endif %}
+        <a href="{{ url_for('index') }}">回到首頁</a>
+    </div>
+</body>
+</html>
