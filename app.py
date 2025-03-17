@@ -14,6 +14,8 @@ supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
+# 固定管理員密鑰
+ADMIN_KEY = "1576"
 
 # 生成 QR Code
 def generate_qr_code(data):
@@ -25,13 +27,6 @@ def generate_qr_code(data):
     img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     return img_byte_arr
-
-# 檢查是否為管理員
-def is_admin():
-    if 'user_id' not in session:
-        return False
-    user = supabase.table('users').select('email').eq('id', session['user_id']).execute().data[0]
-    return user['email'] == 'admin@example.com'
 
 # 首頁
 @app.route('/')
@@ -47,23 +42,20 @@ def register():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        isbns = request.form.getlist('isbn')  # 多本書籍 ISBN
+        isbns = request.form.getlist('isbn')
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         bag_id = f"BAG_{email.split('@')[0]}_{os.urandom(4).hex()}"
 
-        # 檢查信箱是否重複
         existing_user = supabase.table('users').select('email').eq('email', email).execute()
         if existing_user.data:
             flash("此信箱已被註冊！")
             return redirect(url_for('register'))
 
-        # 檢查 ISBN 是否重複
         for isbn in isbns:
             if isbn and supabase.table('publications').select('isbn').eq('isbn', isbn).execute().data:
                 flash(f"ISBN {isbn} 已存在！")
                 return redirect(url_for('register'))
 
-        # 插入用戶（待審核）
         user_data = {
             'email': email,
             'password': hashed_password,
@@ -73,7 +65,6 @@ def register():
         }
         new_user = supabase.table('users').insert(user_data).execute().data[0]
 
-        # 插入提供的書籍
         for isbn in isbns:
             if isbn:
                 supabase.table('publications').insert({
@@ -89,7 +80,7 @@ def register():
         return redirect(url_for('login'))
     return render_template('register.html')
 
-# 登入頁面
+# 登入頁面（僅限普通用戶）
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -112,11 +103,24 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
+# 管理員入口
+@app.route('/admin', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        key = request.form['key']
+        if key == ADMIN_KEY:
+            session['admin'] = True
+            return redirect(url_for('admin_review'))
+        else:
+            flash("密鑰錯誤！")
+            return redirect(url_for('admin_login'))
+    return render_template('admin_login.html')
+
 # 管理員審核頁面
 @app.route('/admin/review', methods=['GET', 'POST'])
 def admin_review():
-    if not is_admin():
-        return redirect(url_for('login'))
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
     
     if request.method == 'POST':
         user_id = request.form['user_id']
@@ -135,8 +139,8 @@ def admin_review():
 # 管理員設定借書上限
 @app.route('/admin/limits', methods=['GET', 'POST'])
 def admin_limits():
-    if not is_admin():
-        return redirect(url_for('login'))
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
     
     if request.method == 'POST':
         user_id = request.form['user_id']
@@ -145,14 +149,14 @@ def admin_limits():
         flash("借書上限已更新！")
         return redirect(url_for('admin_limits'))
 
-    users = supabase.table('users').select('id, email, max_borrow').neq('email', 'admin@example.com').execute().data
+    users = supabase.table('users').select('id, email, max_borrow').execute().data
     return render_template('admin_limits.html', users=users)
 
 # 管理員查看書籍狀態
 @app.route('/admin/books')
 def admin_books():
-    if not is_admin():
-        return redirect(url_for('login'))
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
     books = supabase.table('publications')\
         .select('id, title, isbn, status, owner_id, users(email AS owner_email), reservations(user_id, users(email AS borrower_email))')\
         .execute().data

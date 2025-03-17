@@ -26,6 +26,8 @@ a:hover {
     margin-bottom: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 100%; /* 防止卡片超出螢幕 */
+    box-sizing: border-box;
 }
 
 /* 表格 */
@@ -67,14 +69,18 @@ form {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    width: 100%;
+    max-width: 100%; /* 確保表單不超出 */
 }
 
+/* 輸入框 */
 input[type="text"], input[type="email"], input[type="password"], textarea {
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 8px;
     width: 100%;
-    max-width: 400px;
+    max-width: 100%; /* 防止輸入框超出 */
+    box-sizing: border-box; /* 包含 padding 和 border 在寬度內 */
 }
 
 /* RWD */
@@ -82,13 +88,19 @@ input[type="text"], input[type="email"], input[type="password"], textarea {
     body {
         padding: 10px;
     }
+    .card {
+        padding: 15px;
+    }
     table, th, td {
         font-size: 14px;
+    }
+    th, td {
+        padding: 8px; /* 縮小 padding */
     }
     button, input[type="submit"] {
         padding: 8px 16px;
     }
-    .card {
-        padding: 15px;
+    input[type="text"], input[type="email"], input[type="password"], textarea {
+        font-size: 14px; /* 小螢幕調整字體 */
     }
 }
