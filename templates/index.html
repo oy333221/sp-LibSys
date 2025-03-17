@@ -22,14 +22,9 @@
                 <a href="{{ url_for('show_qr', action='borrow') }}">借書 QR Code</a> | 
                 <a href="{{ url_for('show_qr', action='return') }}">還書 QR Code</a> | 
                 <a href="{{ url_for('return_book') }}">還書</a>
-                {% if is_admin() %}
-                    | <a href="{{ url_for('admin_review') }}">審核註冊</a>
-                    | <a href="{{ url_for('admin_limits') }}">設定借書上限</a>
-                    | <a href="{{ url_for('admin_books') }}">書籍狀態</a>
-                {% endif %}
             </p>
         {% else %}
-            <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
+            <p>未登入，請 <a href="{{ url_for('login') }}">登入</a> | <a href="{{ url_for('admin_login') }}">管理員入口</a></p>
         {% endif %}
     </div>
 

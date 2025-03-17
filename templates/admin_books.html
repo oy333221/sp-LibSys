@@ -8,6 +8,16 @@
 <body>
     <div class="card">
         <h1>書籍狀態</h1>
+        {% if session.admin %}
+            <p>管理員已登入 | 
+                <a href="{{ url_for('admin_review') }}">審核註冊</a> | 
+                <a href="{{ url_for('admin_limits') }}">設定借書上限</a> | 
+                <a href="{{ url_for('admin_login') }}">登出</a>
+            </p>
+        {% else %}
+            <p>未登入，請 <a href="{{ url_for('admin_login') }}">輸入密鑰</a></p>
+        {% endif %}
+        
         {% if books %}
             <table>
                 <tr>
@@ -30,7 +40,7 @@
         {% else %}
             <p>目前沒有書籍。</p>
         {% endif %}
-        <a href="{{ url_for('index') }}">回到首頁</a>
+        <a href="{{ url_for('login') }}">返回用戶登入</a>
     </div>
 </body>
 </html>

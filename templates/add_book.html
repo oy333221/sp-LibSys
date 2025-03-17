@@ -1,27 +1,39 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>新增書籍</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-{% if session.user_id %}
-    <p>已登入，歡迎！ <a href="{{ url_for('logout') }}">登出</a></p>
-{% else %}
-    <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
-{% endif %}
 <body>
-    <h1>新增書籍</h1>
-    <form method="POST" action="{{ url_for('add_book') }}">
-        <label>ISBN:</label>
-        <input type="text" name="isbn" required><br>
-        <label>書名:</label>
-        <input type="text" name="title" required><br>
-        <label>作者:</label>
-        <input type="text" name="author" required><br>
-        <label>描述 (可選):</label>
-        <textarea name="description"></textarea><br>
-        <button type="submit">新增書籍</button>
-    </form>
-    <a href="{{ url_for('index') }}">回到首頁</a>
+    <div class="card">
+        <h1>新增書籍</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: green;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% if session.user_id %}
+            <p>已登入，歡迎！ <a href="{{ url_for('logout') }}">登出</a></p>
+        {% else %}
+            <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('add_book') }}">
+            <label>ISBN:</label>
+            <input type="text" name="isbn" required>
+            <label>書名:</label>
+            <input type="text" name="title" required>
+            <label>作者:</label>
+            <input type="text" name="author" required>
+            <label>描述 (可選):</label>
+            <textarea name="description"></textarea>
+            <input type="submit" value="新增書籍">
+        </form>
+        <a href="{{ url_for('index') }}">回到首頁</a>
+    </div>
 </body>
 </html>

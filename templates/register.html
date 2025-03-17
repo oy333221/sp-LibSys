@@ -24,8 +24,8 @@
             <label>提供的書籍 ISBN（可多本）:</label>
             <div id="isbn-fields">
                 <input type="text" name="isbn" placeholder="ISBN">
-                <input type="text" name="title_{{ request.form.get('isbn') }}" placeholder="書名">
-                <input type="text" name="author_{{ request.form.get('isbn') }}" placeholder="作者"><br>
+                <input type="text" name="title_{{ 'isbn1' }}" placeholder="書名">
+                <input type="text" name="author_{{ 'isbn1' }}" placeholder="作者"><br>
             </div>
             <button type="button" onclick="addIsbnField()">新增一本書</button>
             <input type="submit" value="提交註冊">
@@ -34,13 +34,15 @@
     </div>
 
     <script>
+        let isbnCount = 1;
         function addIsbnField() {
+            isbnCount++;
             const container = document.getElementById('isbn-fields');
             const newFields = document.createElement('div');
             newFields.innerHTML = `
                 <input type="text" name="isbn" placeholder="ISBN">
-                <input type="text" name="title_${Date.now()}" placeholder="書名">
-                <input type="text" name="author_${Date.now()}" placeholder="作者"><br>
+                <input type="text" name="title_isbn${isbnCount}" placeholder="書名">
+                <input type="text" name="author_isbn${isbnCount}" placeholder="作者"><br>
             `;
             container.appendChild(newFields);
         }
