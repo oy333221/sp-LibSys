@@ -33,7 +33,7 @@ def generate_qr_code(data):
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    books = supabase.table('publications').select('*').eq('status', 'available').execute().data
+    books = supabase.table('publications').select('id, title, isbn, author, description, product_link').eq('status', 'available').execute().data
     return render_template('index.html', books=books)
 
 # 註冊頁面
@@ -51,11 +51,6 @@ def register():
             flash("此信箱已被註冊！")
             return redirect(url_for('register'))
 
-        for isbn in isbns:
-            if isbn and supabase.table('publications').select('isbn').eq('isbn', isbn).execute().data:
-                flash(f"ISBN {isbn} 已存在！")
-                return redirect(url_for('register'))
-
         user_data = {
             'email': email,
             'password': hashed_password,
@@ -67,13 +62,11 @@ def register():
 
         for isbn in isbns:
             if isbn:
-                supabase.table('publications').insert({
+                supabase.table('pending_books').insert({
                     'isbn': isbn,
-                    'title': request.form.get(f'title_{isbn}', '未知書名'),
                     'author': request.form.get(f'author_{isbn}', '未知作者'),
                     'owner_id': new_user['id'],
-                    'status': 'available',
-                    'description': ''
+                    'status': 'pending'
                 }).execute()
 
         flash("註冊申請已提交，請等待管理員審核！")
@@ -127,13 +120,28 @@ def admin_review():
         action = request.form['action']
         if action == 'approve':
             supabase.table('users').update({'status': 'approved'}).eq('id', user_id).execute()
-            flash("用戶已通過審核！")
+            pending_books = supabase.table('pending_books').select('*').eq('owner_id', user_id).eq('status', 'pending').execute().data
+            for book in pending_books:
+                supabase.table('publications').insert({
+                    'isbn': book['isbn'],
+                    'title': '待補充',  # 等待爬蟲補充
+                    'author': book['author'],
+                    'owner_id': user_id,
+                    'status': 'available',
+                    'description': '',
+                    'product_link': ''
+                }).execute()
+                supabase.table('pending_books').update({'status': 'approved'}).eq('id', book['id']).execute()
+            flash("用戶及其書籍已通過審核！")
         elif action == 'reject':
             supabase.table('users').update({'status': 'rejected'}).eq('id', user_id).execute()
-            flash("用戶已被拒絕！")
+            supabase.table('pending_books').update({'status': 'rejected'}).eq('owner_id', user_id).execute()
+            flash("用戶及其書籍已被拒絕！")
         return redirect(url_for('admin_review'))
 
     pending_users = supabase.table('users').select('id, email, bag_id').eq('status', 'pending').execute().data
+    for user in pending_users:
+        user['pending_books'] = supabase.table('pending_books').select('isbn, author').eq('owner_id', user['id']).eq('status', 'pending').execute().data
     return render_template('admin_review.html', pending_users=pending_users)
 
 # 管理員設定借書上限
@@ -149,7 +157,7 @@ def admin_limits():
         flash("借書上限已更新！")
         return redirect(url_for('admin_limits'))
 
-    users = supabase.table('users').select('id, email, max_borrow').execute().data
+    users = supabase.table('users').select('id, email, max_borrow').eq('status', 'approved').execute().data
     return render_template('admin_limits.html', users=users)
 
 # 管理員查看書籍狀態
@@ -158,7 +166,7 @@ def admin_books():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
     books = supabase.table('publications')\
-        .select('id, title, isbn, status, owner_id, users(email AS owner_email), reservations(user_id, users(email AS borrower_email))')\
+        .select('id, title, isbn, status, owner_id, users(email AS owner_email, bag_id), reservations(user_id, users(email AS borrower_email))')\
         .execute().data
     return render_template('admin_books.html', books=books)
 
@@ -169,23 +177,19 @@ def add_book():
         return redirect(url_for('login'))
     if request.method == 'POST':
         isbn = request.form['isbn']
-        title = request.form['title']
         author = request.form['author']
         owner_id = session['user_id']
-        description = request.form.get('description', '')
         existing = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
         if existing.data:
             flash("此 ISBN 已存在！")
             return redirect(url_for('add_book'))
-        supabase.table('publications').insert({
+        supabase.table('pending_books').insert({
             'isbn': isbn,
-            'title': title,
             'author': author,
             'owner_id': owner_id,
-            'status': 'available',
-            'description': description
+            'status': 'pending'
         }).execute()
-        flash("書籍已新增！")
+        flash("書籍已提交，請等待管理員審核！")
         return redirect(url_for('index'))
     return render_template('add_book.html')
 
@@ -218,11 +222,15 @@ def borrow(book_id):
 
 # 顯示 QR Code
 @app.route('/qr/<action>')
-def show_qr(action):
-    if 'user_id' not in session:
+@app.route('/qr/<action>/<bag_id>')
+def show_qr(action, bag_id=None):
+    if 'user_id' not in session and 'admin' not in session:
         return redirect(url_for('login'))
-    user = supabase.table('users').select('bag_id').eq('id', session['user_id']).execute().data[0]
-    qr_data = f"{action}:{user['bag_id']}"
+    if bag_id:
+        qr_data = f"{action}:{bag_id}"
+    else:
+        user = supabase.table('users').select('bag_id').eq('id', session['user_id']).execute().data[0]
+        qr_data = f"{action}:{user['bag_id']}"
     qr_img = generate_qr_code(qr_data)
     return send_file(qr_img, mimetype='image/png')
 
