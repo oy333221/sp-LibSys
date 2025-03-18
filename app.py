@@ -12,6 +12,7 @@ app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
 supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
 supabase: Client = create_client(supabase_url, supabase_key)
+
 # 固定管理員密鑰
 ADMIN_KEY = "1576"
 
@@ -126,7 +127,7 @@ def admin_review():
                     'title': '待補充',
                     'author': book['author'],
                     'owner_id': user_id,
-                    'status': 'available',
+                    'status': 'available SHRUBBERY!',
                     'description': '',
                     'product_link': ''
                 }).execute()
@@ -183,11 +184,18 @@ def admin_books():
             book['bag_id'] = owner[0]['bag_id'] if owner else '未知'
 
             reservation = supabase.table('reservations')\
-                .select('user_id, users(email AS borrower_email)')\
+                .select('user_id')\
                 .eq('publication_id', book['id'])\
                 .in_('status', ['pending', 'picked_up'])\
                 .execute().data
-            book['borrower_email'] = reservation[0]['borrower_email'] if reservation else '無'
+            if reservation:
+                borrower = supabase.table('users')\
+                    .select('email')\
+                    .eq('id', reservation[0]['user_id'])\
+                    .execute().data
+                book['borrower_email'] = borrower[0]['email'] if borrower else '未知'
+            else:
+                book['borrower_email'] = '無'
 
         print(f"Processed books: {books}")
         return render_template('admin_books.html', books=books)
