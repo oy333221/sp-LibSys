@@ -25,12 +25,8 @@
         <form method="POST" action="{{ url_for('add_book') }}">
             <label>ISBN:</label>
             <input type="text" name="isbn" required>
-            <label>書名:</label>
-            <input type="text" name="title" required>
             <label>作者:</label>
             <input type="text" name="author" required>
-            <label>描述 (可選):</label>
-            <textarea name="description"></textarea>
             <input type="submit" value="新增書籍">
         </form>
         <a href="{{ url_for('index') }}">回到首頁</a>

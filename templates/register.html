@@ -21,11 +21,10 @@
             <input type="email" name="email" required>
             <label>密碼:</label>
             <input type="password" name="password" required>
-            <label>提供的書籍 ISBN（可多本）:</label>
+            <label>提供的書籍（可多本）:</label>
             <div id="isbn-fields">
-                <input type="text" name="isbn" placeholder="ISBN">
-                <input type="text" name="title_{{ 'isbn1' }}" placeholder="書名">
-                <input type="text" name="author_{{ 'isbn1' }}" placeholder="作者"><br>
+                <input type="text" name="isbn" placeholder="ISBN" required>
+                <input type="text" name="author_isbn1" placeholder="作者" required><br>
             </div>
             <button type="button" onclick="addIsbnField()">新增一本書</button>
             <input type="submit" value="提交註冊">
@@ -40,9 +39,8 @@
             const container = document.getElementById('isbn-fields');
             const newFields = document.createElement('div');
             newFields.innerHTML = `
-                <input type="text" name="isbn" placeholder="ISBN">
-                <input type="text" name="title_isbn${isbnCount}" placeholder="書名">
-                <input type="text" name="author_isbn${isbnCount}" placeholder="作者"><br>
+                <input type="text" name="isbn" placeholder="ISBN" required>
+                <input type="text" name="author_isbn${isbnCount}" placeholder="作者" required><br>
             `;
             container.appendChild(newFields);
         }

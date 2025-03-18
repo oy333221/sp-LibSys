@@ -28,7 +28,7 @@ def generate_qr_code(data):
     img_byte_arr.seek(0)
     return img_byte_arr
 
-# 首頁
+# 首頁（移除 QR Code 和還書連結）
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -94,6 +94,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
+    session.pop('admin', None)
     return redirect(url_for('login'))
 
 # 管理員入口
@@ -109,7 +110,7 @@ def admin_login():
             return redirect(url_for('admin_login'))
     return render_template('admin_login.html')
 
-# 管理員審核頁面
+# 管理員審核頁面（顯示待審書籍）
 @app.route('/admin/review', methods=['GET', 'POST'])
 def admin_review():
     if 'admin' not in session:
@@ -124,7 +125,7 @@ def admin_review():
             for book in pending_books:
                 supabase.table('publications').insert({
                     'isbn': book['isbn'],
-                    'title': '待補充',  # 等待爬蟲補充
+                    'title': '待補充',  # 等待爬蟲
                     'author': book['author'],
                     'owner_id': user_id,
                     'status': 'available',
@@ -160,7 +161,7 @@ def admin_limits():
     users = supabase.table('users').select('id, email, max_borrow').eq('status', 'approved').execute().data
     return render_template('admin_limits.html', users=users)
 
-# 管理員查看書籍狀態
+# 管理員查看書籍狀態（包含 QR Code）
 @app.route('/admin/books')
 def admin_books():
     if 'admin' not in session:
@@ -217,69 +218,144 @@ def borrow(book_id):
         'publication_id': book_id,
         'status': 'pending'
     }).execute()
-    flash(f"已完成借書申請，請於週日 8~13 點前往取書，您的書袋號碼為 {user['bag_id']}，請取書後掃描您的個人條碼完成取書登記。")
+    flash(f"已完成借書申請，請於週日 8~13 點前往取書，您的書袋號碼為 {user['bag_id']}，請等待管理員掃描 QR Code 完成取書登記。")
     return redirect(url_for('index'))
 
-# 顯示 QR Code
-@app.route('/qr/<action>')
-@app.route('/qr/<action>/<bag_id>')
-def show_qr(action, bag_id=None):
-    if 'user_id' not in session and 'admin' not in session:
-        return redirect(url_for('login'))
-    if bag_id:
-        qr_data = f"{action}:{bag_id}"
-    else:
-        user = supabase.table('users').select('bag_id').eq('id', session['user_id']).execute().data[0]
-        qr_data = f"{action}:{user['bag_id']}"
+# 管理員生成 QR Code
+@app.route('/admin/qr/<action>/<bag_id>')
+def admin_show_qr(action, bag_id):
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+    qr_data = f"{action}:{bag_id}"
     qr_img = generate_qr_code(qr_data)
     return send_file(qr_img, mimetype='image/png')
 
-# 借書登記頁面
-@app.route('/borrow_checkin', methods=['GET', 'POST'])
-def borrow_checkin():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user_id = session['user_id']
+# 處理 QR Code 掃描結果（新增路由）
+@app.route('/scan', methods=['POST'])
+def scan_qr():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+    
+    qr_data = request.form.get('qr_data')  # 假設掃描器透過表單提交
+    if not qr_data or ':' not in qr_data:
+        flash("無效的 QR Code！")
+        return redirect(url_for('admin_books'))
+    
+    action, bag_id = qr_data.split(':', 1)
+    user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
+    if not user:
+        flash("找不到此用戶！")
+        return redirect(url_for('admin_books'))
+    user_id = user[0]['id']
 
+    if action == 'borrow':
+        pending_books = supabase.table('reservations')\
+            .select('publication_id').eq('user_id', user_id).eq('status', 'pending').execute().data
+        if not pending_books:
+            flash("此用戶目前沒有待取書籍！")
+            return redirect(url_for('admin_books'))
+        for book in pending_books:
+            supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
+        flash("借書登記完成！")
+    elif action == 'return':
+        borrowed_books = supabase.table('reservations')\
+            .select('publication_id').eq('user_id', user_id).in_('status', ['pending', 'picked_up']).execute().data
+        if not borrowed_books:
+            flash("此用戶目前沒有借閱書籍！")
+            return redirect(url_for('admin_books'))
+        for book in borrowed_books:
+            supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
+            supabase.table('publications').update({'status': 'available'}).eq('id', book['publication_id']).execute()
+        flash("還書登記完成！")
+    else:
+        flash("無效的操作！")
+    
+    return redirect(url_for('admin_books'))
+
+# 借書登記頁面（僅限管理員）
+@app.route('/admin/borrow_checkin', methods=['GET', 'POST'])
+def admin_borrow_checkin():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
     if request.method == 'POST':
+        user_id = request.form['user_id']
         book_ids = request.form.getlist('book_ids')
         for book_id in book_ids:
             reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', 'pending').execute().data
             if reservation:
                 supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
-        flash("可以取書了，記得於週日同一時間返還，並提醒還書時掃描還書 QR Code。")
-        return redirect(url_for('index'))
+        flash("借書登記完成！")
+        return redirect(url_for('admin_borrow_checkin'))
 
-    pending_books = supabase.table('reservations')\
-        .select('publication_id, publications(title, author, isbn)')\
-        .eq('user_id', user_id)\
+    pending_reservations = supabase.table('reservations')\
+        .select('user_id, publication_id, users(email), publications(title, author, isbn)')\
         .eq('status', 'pending')\
         .execute().data
-    return render_template('borrow_checkin.html', pending_books=pending_books)
+    return render_template('admin_borrow_checkin.html', pending_reservations=pending_reservations)
 
-# 還書頁面
-@app.route('/return', methods=['GET', 'POST'])
-def return_book():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user_id = session['user_id']
-
+# 還書頁面（僅限管理員）
+@app.route('/admin/return', methods=['GET', 'POST'])
+def admin_return_book():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
     if request.method == 'POST':
+        user_id = request.form['user_id']
         book_ids = request.form.getlist('book_ids')
         for book_id in book_ids:
             reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).in_('status', ['pending', 'picked_up']).execute().data
             if reservation:
                 supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
                 supabase.table('publications').update({'status': 'available'}).eq('id', book_id).execute()
-        flash("可以將書放入個人書袋，完成還書。")
-        return redirect(url_for('index'))
+        flash("還書登記完成！")
+        return redirect(url_for('admin_return_book'))
 
     borrowed_books = supabase.table('reservations')\
-        .select('publication_id, publications(title, author, isbn)')\
-        .eq('user_id', user_id)\
+        .select('user_id, publication_id, users(email), publications(title, author, isbn)')\
         .in_('status', ['pending', 'picked_up'])\
         .execute().data
-    return render_template('return.html', borrowed_books=borrowed_books)
+    return render_template('admin_return.html', borrowed_books=borrowed_books)
+
+@app.route('/admin/scan', methods=['GET', 'POST'])
+def admin_scan():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+    if request.method == 'POST':
+        qr_data = request.form['qr_data']
+        # 複製 /scan 邏輯
+        if not qr_data or ':' not in qr_data:
+            flash("無效的 QR Code！")
+            return redirect(url_for('admin_scan'))
+        
+        action, bag_id = qr_data.split(':', 1)
+        user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
+        if not user:
+            flash("找不到此用戶！")
+            return redirect(url_for('admin_scan'))
+        user_id = user[0]['id']
+
+        if action == 'borrow':
+            pending_books = supabase.table('reservations')\
+                .select('publication_id').eq('user_id', user_id).eq('status', 'pending').execute().data
+            if not pending_books:
+                flash("此用戶目前沒有待取書籍！")
+                return redirect(url_for('admin_scan'))
+            for book in pending_books:
+                supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
+            flash("借書登記完成！")
+        elif action == 'return':
+            borrowed_books = supabase.table('reservations')\
+                .select('publication_id').eq('user_id', user_id).in_('status', ['pending', 'picked_up']).execute().data
+            if not borrowed_books:
+                flash("此用戶目前沒有借閱書籍！")
+                return redirect(url_for('admin_scan'))
+            for book in borrowed_books:
+                supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
+                supabase.table('publications').update({'status': 'available'}).eq('id', book['publication_id']).execute()
+            flash("還書登記完成！")
+        else:
+            flash("無效的操作！")
+        return redirect(url_for('admin_scan'))
+    return render_template('admin_scan.html')
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))

@@ -31,12 +31,18 @@
                 <tr>
                     <th>信箱</th>
                     <th>書袋號碼</th>
+                    <th>待審書籍</th>
                     <th>操作</th>
                 </tr>
                 {% for user in pending_users %}
                     <tr>
                         <td>{{ user.email }}</td>
                         <td>{{ user.bag_id }}</td>
+                        <td>
+                            {% for book in user.pending_books %}
+                                ISBN: {{ book.isbn }}, 作者: {{ book.author }}<br>
+                            {% endfor %}
+                        </td>
                         <td>
                             <form method="POST" action="{{ url_for('admin_review') }}">
                                 <input type="hidden" name="user_id" value="{{ user.id }}">
