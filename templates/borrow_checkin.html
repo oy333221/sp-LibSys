@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>借書登記</title>
+    <title>確認取書</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
     <div class="card">
-        <h1>借書登記</h1>
+        <h1>確認取書 - 書袋 {{ bag_id }}</h1>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
@@ -16,15 +16,8 @@
             {% endif %}
         {% endwith %}
         
-        {% if session.user_id %}
-            <p>已登入，歡迎！ <a href="{{ url_for('logout') }}">登出</a></p>
-        {% else %}
-            <p>未登入，請 <a href="{{ url_for('login') }}">登入</a></p>
-        {% endif %}
-        
-        <h2>待取書籍</h2>
         {% if pending_books %}
-            <form method="POST" action="{{ url_for('borrow_checkin') }}">
+            <form method="POST">
                 <table>
                     <tr>
                         <th>書名</th>
@@ -44,9 +37,9 @@
                 <input type="submit" value="確認取書">
             </form>
         {% else %}
-            <p>您目前沒有待取的書籍。</p>
+            <p>目前沒有待取書籍。</p>
         {% endif %}
-        <a href="{{ url_for('index') }}">回到首頁</a>
+        <a href="{{ url_for('index') }}">返回首頁</a>
     </div>
 </body>
 </html>

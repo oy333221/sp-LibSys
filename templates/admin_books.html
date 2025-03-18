@@ -20,12 +20,9 @@
             <p>管理員已登入 | 
                 <a href="{{ url_for('admin_review') }}">審核註冊</a> | 
                 <a href="{{ url_for('admin_limits') }}">設定借書上限</a> | 
-                <a href="{{ url_for('admin_borrow_checkin') }}">借書登記</a> | 
-                <a href="{{ url_for('admin_return_book') }}">還書登記</a> | 
+                <a href="{{ url_for('admin_reservations') }}">借閱狀態</a> | 
                 <a href="{{ url_for('logout') }}">登出</a>
             </p>
-        {% else %}
-            <p>未登入，請 <a href="{{ url_for('admin_login') }}">輸入密鑰</a></p>
         {% endif %}
         
         {% if books %}
@@ -36,8 +33,6 @@
                     <th>狀態</th>
                     <th>提供者</th>
                     <th>借閱者</th>
-                    <th>借書 QR Code</th>
-                    <th>還書 QR Code</th>
                 </tr>
                 {% for book in books %}
                     <tr>
@@ -46,8 +41,6 @@
                         <td>{{ book.status }}</td>
                         <td>{{ book.owner_email }}</td>
                         <td>{{ book.borrower_email }}</td>
-                        <td><a href="{{ url_for('admin_show_qr', action='borrow', bag_id=book.bag_id) }}" target="_blank">查看</a></td>
-                        <td><a href="{{ url_for('admin_show_qr', action='return', bag_id=book.bag_id) }}" target="_blank">查看</a></td>
                     </tr>
                 {% endfor %}
             </table>

@@ -72,7 +72,7 @@ def register():
         return redirect(url_for('login'))
     return render_template('register.html')
 
-# 登入頁面（僅限普通用戶）
+# 登入頁面
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -127,7 +127,7 @@ def admin_review():
                     'title': '待補充',
                     'author': book['author'],
                     'owner_id': user_id,
-                    'status': 'available SHRUBBERY!',
+                    'status': 'available',
                     'description': '',
                     'product_link': ''
                 }).execute()
@@ -250,102 +250,105 @@ def borrow(book_id):
         'publication_id': book_id,
         'status': 'pending'
     }).execute()
-    flash(f"已完成借書申請，請於週日 8~13 點前往取書，您的書袋號碼為 {user['bag_id']}，請等待管理員掃描 QR Code 完成取書登記。")
+    flash(f"已完成借書申請，請於週日 8~13 點前往取書，您的書袋號碼為 {user['bag_id']}，到現場掃描您的借書 QR Code 確認取書。")
     return redirect(url_for('index'))
 
-# 管理員生成 QR Code
+# 管理員生成用戶的 QR Code
 @app.route('/admin/qr/<action>/<bag_id>')
 def admin_show_qr(action, bag_id):
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    qr_data = f"{action}:{bag_id}"
+    if action not in ['borrow', 'return']:
+        return "無效的操作", 400
+    # QR Code 指向用戶專屬頁面
+    qr_data = url_for('borrow_checkin' if action == 'borrow' else 'return_book', bag_id=bag_id, _external=True)
     qr_img = generate_qr_code(qr_data)
     return send_file(qr_img, mimetype='image/png')
 
-# 處理 QR Code 掃描結果
-@app.route('/scan', methods=['POST'])
-def scan_qr():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
-    
-    qr_data = request.form.get('qr_data')
-    if not qr_data or ':' not in qr_data:
-        flash("無效的 QR Code！")
-        return redirect(url_for('admin_books'))
-    
-    action, bag_id = qr_data.split(':', 1)
+# 借書確認頁面（掃描借書 QR Code 後）
+@app.route('/borrow_checkin/<bag_id>', methods=['GET', 'POST'])
+def borrow_checkin(bag_id):
     user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
     if not user:
-        flash("找不到此用戶！")
-        return redirect(url_for('admin_books'))
+        flash("無效的書袋號碼！")
+        return redirect(url_for('login'))
     user_id = user[0]['id']
 
-    if action == 'borrow':
-        pending_books = supabase.table('reservations')\
-            .select('publication_id').eq('user_id', user_id).eq('status', 'pending').execute().data
-        if not pending_books:
-            flash("此用戶目前沒有待取書籍！")
-            return redirect(url_for('admin_books'))
-        for book in pending_books:
-            supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
-        flash("借書登記完成！")
-    elif action == 'return':
-        borrowed_books = supabase.table('reservations')\
-            .select('publication_id').eq('user_id', user_id).in_('status', ['pending', 'picked_up']).execute().data
-        if not borrowed_books:
-            flash("此用戶目前沒有借閱書籍！")
-            return redirect(url_for('admin_books'))
-        for book in borrowed_books:
-            supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
-            supabase.table('publications').update({'status': 'available'}).eq('id', book['publication_id']).execute()
-        flash("還書登記完成！")
-    else:
-        flash("無效的操作！")
-    
-    return redirect(url_for('admin_books'))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
 
-# 借書登記頁面（僅限管理員）
-@app.route('/admin/borrow_checkin', methods=['GET', 'POST'])
-def admin_borrow_checkin():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
+    if session['user_id'] != user_id:
+        flash("這不是您的書袋！")
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
-        user_id = request.form['user_id']
         book_ids = request.form.getlist('book_ids')
         for book_id in book_ids:
-            reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', 'pending').execute().data
+            reservation = supabase.table('reservations')\
+                .select('status')\
+                .eq('user_id', user_id)\
+                .eq('publication_id', book_id)\
+                .eq('status', 'pending')\
+                .execute().data
             if reservation:
                 supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
-        flash("借書登記完成！")
-        return redirect(url_for('admin_borrow_checkin'))
+        flash("已確認取書，您可以帶走書籍了！")
+        return redirect(url_for('index'))
 
-    pending_reservations = supabase.table('reservations')\
-        .select('user_id, publication_id, users(email), publications(title, author, isbn)')\
+    pending_books = supabase.table('reservations')\
+        .select('publication_id, publications(title, author, isbn)')\
+        .eq('user_id', user_id)\
         .eq('status', 'pending')\
         .execute().data
-    return render_template('admin_borrow_checkin.html', pending_reservations=pending_reservations)
+    return render_template('borrow_checkin.html', pending_books=pending_books, bag_id=bag_id)
 
-# 還書頁面（僅限管理員）
-@app.route('/admin/return', methods=['GET', 'POST'])
-def admin_return_book():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
+# 還書頁面（掃描還書 QR Code 後）
+@app.route('/return/<bag_id>', methods=['GET', 'POST'])
+def return_book(bag_id):
+    user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
+    if not user:
+        flash("無效的書袋號碼！")
+        return redirect(url_for('login'))
+    user_id = user[0]['id']
+
     if request.method == 'POST':
-        user_id = request.form['user_id']
         book_ids = request.form.getlist('book_ids')
         for book_id in book_ids:
-            reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).in_('status', ['pending', 'picked_up']).execute().data
+            reservation = supabase.table('reservations')\
+                .select('status')\
+                .eq('user_id', user_id)\
+                .eq('publication_id', book_id)\
+                .in_('status', ['pending', 'picked_up'])\
+                .execute().data
             if reservation:
                 supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
                 supabase.table('publications').update({'status': 'available'}).eq('id', book_id).execute()
-        flash("還書登記完成！")
-        return redirect(url_for('admin_return_book'))
+        flash("已確認還書，請將書籍放入袋中！")
+        return redirect(url_for('return_book', bag_id=bag_id))
 
     borrowed_books = supabase.table('reservations')\
-        .select('user_id, publication_id, users(email), publications(title, author, isbn)')\
+        .select('publication_id, publications(title, author, isbn)')\
+        .eq('user_id', user_id)\
         .in_('status', ['pending', 'picked_up'])\
         .execute().data
-    return render_template('admin_return.html', borrowed_books=borrowed_books)
+    return render_template('return.html', borrowed_books=borrowed_books, bag_id=bag_id)
+
+# 管理員查看借閱狀態（確認放入袋子）
+@app.route('/admin/reservations', methods=['GET', 'POST'])
+def admin_reservations():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+    if request.method == 'POST':
+        reservation_id = request.form['reservation_id']
+        supabase.table('reservations').update({'status': 'prepared'}).eq('id', reservation_id).execute()
+        flash("已確認放入借書袋！")
+        return redirect(url_for('admin_reservations'))
+
+    pending_reservations = supabase.table('reservations')\
+        .select('id, user_id, publication_id, users(email, bag_id), publications(title, isbn)')\
+        .eq('status', 'pending')\
+        .execute().data
+    return render_template('admin_reservations.html', pending_reservations=pending_reservations)
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
