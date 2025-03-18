@@ -12,8 +12,6 @@ app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
 supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
 supabase: Client = create_client(supabase_url, supabase_key)
-
-
 # 固定管理員密鑰
 ADMIN_KEY = "1576"
 
@@ -28,7 +26,7 @@ def generate_qr_code(data):
     img_byte_arr.seek(0)
     return img_byte_arr
 
-# 首頁（移除 QR Code 和還書連結）
+# 首頁
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -110,7 +108,7 @@ def admin_login():
             return redirect(url_for('admin_login'))
     return render_template('admin_login.html')
 
-# 管理員審核頁面（顯示待審書籍）
+# 管理員審核頁面
 @app.route('/admin/review', methods=['GET', 'POST'])
 def admin_review():
     if 'admin' not in session:
@@ -125,7 +123,7 @@ def admin_review():
             for book in pending_books:
                 supabase.table('publications').insert({
                     'isbn': book['isbn'],
-                    'title': '待補充',  # 等待爬蟲
+                    'title': '待補充',
                     'author': book['author'],
                     'owner_id': user_id,
                     'status': 'available',
@@ -161,29 +159,41 @@ def admin_limits():
     users = supabase.table('users').select('id, email, max_borrow').eq('status', 'approved').execute().data
     return render_template('admin_limits.html', users=users)
 
-# 管理員查看書籍狀態（包含 QR Code）
+# 管理員查看書籍狀態
 @app.route('/admin/books')
 def admin_books():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
     try:
         books = supabase.table('publications')\
-            .select('id, title, isbn, status, owner_id, users(email AS owner_email, bag_id)')\
+            .select('id, title, isbn, status, owner_id')\
             .execute().data
-        
-        # 手動查詢借閱者資料，避免複雜嵌套
+        print(f"Books retrieved: {books}")
+
+        if not books:
+            print("No books found in publications table.")
+            return render_template('admin_books.html', books=[])
+
         for book in books:
+            owner = supabase.table('users')\
+                .select('email, bag_id')\
+                .eq('id', book['owner_id'])\
+                .execute().data
+            book['owner_email'] = owner[0]['email'] if owner else '未知用戶'
+            book['bag_id'] = owner[0]['bag_id'] if owner else '未知'
+
             reservation = supabase.table('reservations')\
                 .select('user_id, users(email AS borrower_email)')\
                 .eq('publication_id', book['id'])\
                 .in_('status', ['pending', 'picked_up'])\
                 .execute().data
             book['borrower_email'] = reservation[0]['borrower_email'] if reservation else '無'
-        
+
+        print(f"Processed books: {books}")
         return render_template('admin_books.html', books=books)
     except Exception as e:
         print(f"Error in admin_books: {str(e)}")
-        return "伺服器錯誤，請稍後再試", 500
+        return f"伺服器錯誤: {str(e)}", 500
 
 # 新增書籍頁面
 @app.route('/add_book', methods=['GET', 'POST'])
@@ -244,13 +254,13 @@ def admin_show_qr(action, bag_id):
     qr_img = generate_qr_code(qr_data)
     return send_file(qr_img, mimetype='image/png')
 
-# 處理 QR Code 掃描結果（新增路由）
+# 處理 QR Code 掃描結果
 @app.route('/scan', methods=['POST'])
 def scan_qr():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
     
-    qr_data = request.form.get('qr_data')  # 假設掃描器透過表單提交
+    qr_data = request.form.get('qr_data')
     if not qr_data or ':' not in qr_data:
         flash("無效的 QR Code！")
         return redirect(url_for('admin_books'))
@@ -329,48 +339,6 @@ def admin_return_book():
         .execute().data
     return render_template('admin_return.html', borrowed_books=borrowed_books)
 
-@app.route('/admin/scan', methods=['GET', 'POST'])
-def admin_scan():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
-    if request.method == 'POST':
-        qr_data = request.form['qr_data']
-        # 複製 /scan 邏輯
-        if not qr_data or ':' not in qr_data:
-            flash("無效的 QR Code！")
-            return redirect(url_for('admin_scan'))
-        
-        action, bag_id = qr_data.split(':', 1)
-        user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
-        if not user:
-            flash("找不到此用戶！")
-            return redirect(url_for('admin_scan'))
-        user_id = user[0]['id']
-
-        if action == 'borrow':
-            pending_books = supabase.table('reservations')\
-                .select('publication_id').eq('user_id', user_id).eq('status', 'pending').execute().data
-            if not pending_books:
-                flash("此用戶目前沒有待取書籍！")
-                return redirect(url_for('admin_scan'))
-            for book in pending_books:
-                supabase.table('reservations').update({'status': 'picked_up'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
-            flash("借書登記完成！")
-        elif action == 'return':
-            borrowed_books = supabase.table('reservations')\
-                .select('publication_id').eq('user_id', user_id).in_('status', ['pending', 'picked_up']).execute().data
-            if not borrowed_books:
-                flash("此用戶目前沒有借閱書籍！")
-                return redirect(url_for('admin_scan'))
-            for book in borrowed_books:
-                supabase.table('reservations').update({'status': 'returned'}).eq('user_id', user_id).eq('publication_id', book['publication_id']).execute()
-                supabase.table('publications').update({'status': 'available'}).eq('id', book['publication_id']).execute()
-            flash("還書登記完成！")
-        else:
-            flash("無效的操作！")
-        return redirect(url_for('admin_scan'))
-    return render_template('admin_scan.html')
-
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
