@@ -45,7 +45,7 @@
                         <td>{{ book.isbn }}</td>
                         <td>{{ book.status }}</td>
                         <td>{{ book.owner_email }}</td>
-                        <td>{{ book.reservations[0].borrower_email if book.reservations else '無' }}</td>
+                        <td>{{ book.borrower_email }}</td>
                         <td><a href="{{ url_for('admin_show_qr', action='borrow', bag_id=book.bag_id) }}" target="_blank">查看</a></td>
                         <td><a href="{{ url_for('admin_show_qr', action='return', bag_id=book.bag_id) }}" target="_blank">查看</a></td>
                     </tr>

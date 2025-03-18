@@ -166,10 +166,24 @@ def admin_limits():
 def admin_books():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    books = supabase.table('publications')\
-        .select('id, title, isbn, status, owner_id, users(email AS owner_email, bag_id), reservations(user_id, users(email AS borrower_email))')\
-        .execute().data
-    return render_template('admin_books.html', books=books)
+    try:
+        books = supabase.table('publications')\
+            .select('id, title, isbn, status, owner_id, users(email AS owner_email, bag_id)')\
+            .execute().data
+        
+        # 手動查詢借閱者資料，避免複雜嵌套
+        for book in books:
+            reservation = supabase.table('reservations')\
+                .select('user_id, users(email AS borrower_email)')\
+                .eq('publication_id', book['id'])\
+                .in_('status', ['pending', 'picked_up'])\
+                .execute().data
+            book['borrower_email'] = reservation[0]['borrower_email'] if reservation else '無'
+        
+        return render_template('admin_books.html', books=books)
+    except Exception as e:
+        print(f"Error in admin_books: {str(e)}")
+        return "伺服器錯誤，請稍後再試", 500
 
 # 新增書籍頁面
 @app.route('/add_book', methods=['GET', 'POST'])
