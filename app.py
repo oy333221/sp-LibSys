@@ -81,8 +81,8 @@ def logout():
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        password = request.form['password']
-        if password == "admin123":  # 簡單密碼，建議改進
+        password = request.form['password']  # 如果表單沒 password，這裡會崩潰
+        if password == "1576":
             session['admin'] = True
             return redirect(url_for('admin_review'))
         flash("密碼錯誤！")
