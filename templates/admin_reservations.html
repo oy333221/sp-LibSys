@@ -1,12 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>管理員 - 借閱狀態</title>
+    <title>管理員 - 預約管理</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header>
-        <h1>管理員 - 借閱狀態</h1>
+        <h1>管理員 - 預約管理</h1>
+        <nav>
+            <a href="{{ url_for('admin_review') }}">用戶審核</a>
+            <a href="{{ url_for('admin_books') }}">書籍管理</a>
+            <a href="{{ url_for('admin_qr_codes') }}">查看 QR Codes</a>
+            <a href="{{ url_for('logout') }}">登出</a>
+        </nav>
     </header>
     <main>
         {% with messages = get_flashed_messages() %}
@@ -15,48 +21,36 @@
             {% endif %}
         {% endwith %}
         <section class="card">
-            <h2>待放入書袋</h2>
-            <table>
-                <tr><th>用戶</th><th>書袋</th><th>書名</th><th>ISBN</th><th>操作</th></tr>
-                {% for res in pending_reservations %}
-                    <tr>
-                        <td>{{ res.users.phone }}</td>
-                        <td>{{ res.users.bag_id }}</td>
-                        <td>{{ res.publications.title }}</td>
-                        <td>{{ res.publications.isbn }}</td>
-                        <td>
-                            <form method="POST">
-                                <input type="hidden" name="reservation_id" value="{{ res.id }}">
-                                <input type="hidden" name="action" value="prepare">
-                                <button type="submit">確認放入</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
+            <h2>預約列表</h2>
+            {% if reservations %}
+                <table>
+                    <tr><th>用戶ID</th><th>書名</th><th>ISBN</th><th>狀態</th><th>操作</th></tr>
+                    {% for res in reservations %}
+                        <tr>
+                            <td>{{ res.user_id }}</td>
+                            <td>{{ res.publications.title }}</td>
+                            <td>{{ res.publications.isbn }}</td>
+                            <td>{{ res.status }}</td>
+                            <td>
+                                {% if res.status == 'pending' %}
+                                    <form method="POST">
+                                        <input type="hidden" name="reservation_id" value="{{ res.id }}">
+                                        <button type="submit" name="action" value="prepare">放入書袋</button>
+                                    </form>
+                                {% elif res.status == 'returned' %}
+                                    <form method="POST">
+                                        <input type="hidden" name="reservation_id" value="{{ res.id }}">
+                                        <button type="submit" name="action" value="re-shelf">重新上架</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>目前無預約。</p>
+            {% endif %}
         </section>
-        <section class="card">
-            <h2>待重新上架</h2>
-            <table>
-                <tr><th>用戶</th><th>書袋</th><th>書名</th><th>ISBN</th><th>操作</th></tr>
-                {% for res in returned_reservations %}
-                    <tr>
-                        <td>{{ res.users.phone }}</td>
-                        <td>{{ res.users.bag_id }}</td>
-                        <td>{{ res.publications.title }}</td>
-                        <td>{{ res.publications.isbn }}</td>
-                        <td>
-                            <form method="POST">
-                                <input type="hidden" name="reservation_id" value="{{ res.id }}">
-                                <input type="hidden" name="action" value="re-shelf">
-                                <button type="submit">重新上架</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
-        </section>
-        <a href="{{ url_for('admin_review') }}" class="btn">返回審核</a>
     </main>
 </body>
 </html>

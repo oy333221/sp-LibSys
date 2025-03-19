@@ -7,6 +7,12 @@
 <body>
     <header>
         <h1>管理員 - 審核</h1>
+        <nav>
+            <a href="{{ url_for('admin_books') }}">書籍管理</a>
+            <a href="{{ url_for('admin_reservations') }}">預約管理</a>
+            <a href="{{ url_for('admin_qr_codes') }}">查看 QR Codes</a>
+            <a href="{{ url_for('logout') }}">登出</a>
+        </nav>
     </header>
     <main>
         {% with messages = get_flashed_messages() %}
@@ -14,29 +20,30 @@
                 <div class="flash">{{ messages[0] }}</div>
             {% endif %}
         {% endwith %}
-        {% for user in pending_users %}
-            <section class="card">
-                <h3>用戶: {{ user.phone }} ({{ user.bag_id }})</h3>
+        <section class="card">
+            <h2>待審核用戶</h2>
+            {% if pending_users %}
                 <table>
-                    <tr><th>書名</th><th>ISBN</th><th>狀態</th></tr>
-                    {% for book in user.pending_books %}
+                    <tr><th>手機號碼</th><th>書袋編號</th><th>QR Code</th><th>操作</th></tr>
+                    {% for user in pending_users %}
                         <tr>
-                            <td>{{ book.title }}</td>
-                            <td>{{ book.isbn }}</td>
-                            <td>{{ book.status }}</td>
+                            <td>{{ user.phone }}</td>
+                            <td>{{ user.bag_id }}</td>
+                            <td><a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" target="_blank">查看</a></td>
+                            <td>
+                                <form method="POST">
+                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                    <button type="submit" name="action" value="approved">通過</button>
+                                    <button type="submit" name="action" value="rejected">拒絕</button>
+                                </form>
+                            </td>
                         </tr>
                     {% endfor %}
                 </table>
-                <form method="POST">
-                    <input type="hidden" name="user_id" value="{{ user.id }}">
-                    <button type="submit" name="action" value="approve">通過</button>
-                    <button type="submit" name="action" value="reject">拒絕</button>
-                    <a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" class="btn" target="_blank">生成 QR Code</a>
-                </form>
-            </section>
-        {% endfor %}
-        <a href="{{ url_for('admin_books') }}" class="btn">查看書籍狀態</a>
-        <a href="{{ url_for('admin_reservations') }}" class="btn">查看借閱狀態</a>
+            {% else %}
+                <p>目前無待審核用戶。</p>
+            {% endif %}
+        </section>
     </main>
 </body>
 </html>
