@@ -15,27 +15,15 @@
             {% endif %}
         {% endwith %}
         <form method="POST" class="card">
-            <input type="text" name="phone" placeholder="手機號碼 (09xxxxxxxx)" required>
+            <input type="hidden" name="token" value="{{ token }}">
+            <input type="text" name="name" placeholder="姓名" required>
+            <input type="text" name="phone" placeholder="手機號碼" required>
             <input type="password" name="password" placeholder="密碼" required>
-            <h3>提供交換的書籍</h3>
-            <div id="book-list">
-                <div class="book-entry">
-                    <input type="text" name="isbn" placeholder="ISBN">
-                    <input type="text" name="title" placeholder="書名">
-                </div>
-            </div>
-            <button type="button" onclick="addBook()">新增書籍</button>
-            <input type="submit" value="提交註冊">
+            <input type="text" name="isbn" placeholder="書籍 ISBN" required>
+            <input type="text" name="title" placeholder="書籍標題" required>
+            <input type="submit" value="註冊">
         </form>
-        <a href="{{ url_for('login') }}" class="btn">返回登入</a>
+        <a href="{{ url_for('login') }}" class="btn">已有帳號？登入</a>
     </main>
-    <script>
-        function addBook() {
-            const div = document.createElement('div');
-            div.className = 'book-entry';
-            div.innerHTML = '<input type="text" name="isbn" placeholder="ISBN"><input type="text" name="title" placeholder="書名">';
-            document.getElementById('book-list').appendChild(div);
-        }
-    </script>
 </body>
 </html>

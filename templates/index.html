@@ -21,12 +21,12 @@
             <h2>可借閱書籍</h2>
             {% if books %}
                 <table>
-                    <tr><th>書名</th><th>ISBN</th><th>作者</th><th>操作</th></tr>
+                    <tr><th>書名</th><th>簡介</th><th>連結</th><th>操作</th></tr>
                     {% for book in books %}
                         <tr>
                             <td>{{ book.title }}</td>
-                            <td>{{ book.isbn }}</td>
-                            <td>{{ book.author }}</td>
+                            <td>{{ book.description | default('無簡介') }}</td>
+                            <td><a href="{{ book.product_link | default('#') }}" target="_blank">查看</a></td>
                             <td>
                                 <form method="POST" action="{{ url_for('borrow', book_id=book.id) }}">
                                     <button type="submit">預約</button>
@@ -43,14 +43,13 @@
             <h2>我的預約與借閱</h2>
             {% if reservations %}
                 <table>
-                    <tr><th>書名</th><th>ISBN</th><th>狀態</th><th>操作</th></tr>
+                    <tr><th>書名</th><th>狀態</th><th>操作</th></tr>
                     {% for res in reservations %}
                         <tr>
                             <td>{{ res.publications.title }}</td>
-                            <td>{{ res.publications.isbn }}</td>
                             <td>{{ res.status }}</td>
                             <td>
-                                {% if res.status == 'pending' %}
+                                {% if res.status == '待處理' %}
                                     <form method="POST" action="{{ url_for('cancel_borrow', reservation_id=res.id) }}">
                                         <button type="submit">取消</button>
                                     </form>

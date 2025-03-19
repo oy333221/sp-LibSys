@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>管理員 - 書籍狀態</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>書籍狀態</h1>
+        <nav>
+            <a href="{{ url_for('admin_review') }}">審核</a>
+            <a href="{{ url_for('admin_qr_codes') }}">QR Codes</a>
+            <a href="{{ url_for('logout') }}">登出</a>
+        </nav>
+    </header>
+    <main>
+        <section class="card">
+            <h2>目前書籍狀態</h2>
+            <table>
+                <tr><th>書名</th><th>狀態</th><th>持有者姓名</th><th>持有者手機</th><th>預約狀態</th></tr>
+                {% for book in books %}
+                    <tr>
+                        <td>{{ book.title }}</td>
+                        <td>{{ book.status }}</td>
+                        <td>{{ book.reservations[0].users.name if book.reservations else '無' }}</td>
+                        <td>{{ book.reservations[0].users.phone if book.reservations else '無' }}</td>
+                        <td>{{ book.reservations[0].status if book.reservations else '無' }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </section>
+    </main>
+</body>
+</html>

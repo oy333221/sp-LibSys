@@ -9,13 +9,18 @@
         <h1>所有用戶 QR Codes</h1>
         <nav>
             <a href="{{ url_for('admin_review') }}">返回審核</a>
+            <a href="{{ url_for('admin_book_status') }}">書籍狀態</a>
             <a href="{{ url_for('logout') }}">登出</a>
         </nav>
     </header>
     <main>
+        <form method="POST" class="card">
+            <input type="text" name="search_name" placeholder="搜尋用戶姓名" value="{{ search_name }}">
+            <input type="submit" value="搜尋">
+        </form>
         {% for user in users %}
             <section class="card">
-                <h3>用戶: {{ user.phone }} ({{ user.bag_id }})</h3>
+                <h3>用戶: {{ user.name }} ({{ user.phone }}) - {{ user.bag_id }}</h3>
                 <a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" target="_blank">
                     <img src="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" alt="QR Code">
                 </a>

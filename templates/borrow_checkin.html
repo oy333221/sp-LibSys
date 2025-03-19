@@ -21,7 +21,7 @@
             <h3>待取書籍</h3>
             {% if pending_books %}
                 {% for book in pending_books %}
-                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }} ({{ book.publications.isbn }})</label><br>
+                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }}</label><br>
                 {% endfor %}
                 <input type="hidden" name="action" value="borrow">
                 <input type="submit" value="確認取書">
@@ -33,7 +33,7 @@
             <h3>待還書籍</h3>
             {% if borrowed_books %}
                 {% for book in borrowed_books %}
-                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }} ({{ book.publications.isbn }})</label><br>
+                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }}</label><br>
                 {% endfor %}
                 <input type="hidden" name="action" value="return">
                 <input type="submit" value="確認還書">

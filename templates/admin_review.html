@@ -8,9 +8,8 @@
     <header>
         <h1>管理員 - 審核</h1>
         <nav>
-            <a href="{{ url_for('admin_books') }}">書籍管理</a>
-            <a href="{{ url_for('admin_reservations') }}">預約管理</a>
-            <a href="{{ url_for('admin_qr_codes') }}">查看 QR Codes</a>
+            <a href="{{ url_for('admin_book_status') }}">書籍狀態</a>
+            <a href="{{ url_for('admin_qr_codes') }}">QR Codes</a>
             <a href="{{ url_for('logout') }}">登出</a>
         </nav>
     </header>
@@ -24,12 +23,12 @@
             <h2>待審核用戶</h2>
             {% if pending_users %}
                 <table>
-                    <tr><th>手機號碼</th><th>書袋編號</th><th>QR Code</th><th>操作</th></tr>
+                    <tr><th>姓名</th><th>手機號碼</th><th>書袋編號</th><th>操作</th></tr>
                     {% for user in pending_users %}
                         <tr>
+                            <td>{{ user.name }}</td>
                             <td>{{ user.phone }}</td>
                             <td>{{ user.bag_id }}</td>
-                            <td><a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" target="_blank">查看</a></td>
                             <td>
                                 <form method="POST">
                                     <input type="hidden" name="user_id" value="{{ user.id }}">
@@ -42,6 +41,30 @@
                 </table>
             {% else %}
                 <p>目前無待審核用戶。</p>
+            {% endif %}
+        </section>
+        <section class="card">
+            <h2>待審核書籍</h2>
+            {% if pending_books %}
+                <table>
+                    <tr><th>ISBN</th><th>書名</th><th>擁有者</th><th>操作</th></tr>
+                    {% for book in pending_books %}
+                        <tr>
+                            <td>{{ book.isbn }}</td>
+                            <td>{{ book.title }}</td>
+                            <td>{{ book.owner_id }}</td>
+                            <td>
+                                <form method="POST">
+                                    <input type="hidden" name="book_id" value="{{ book.id }}">
+                                    <button type="submit" name="action" value="approved">通過</button>
+                                    <button type="submit" name="action" value="rejected">拒絕</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>目前無待審核書籍。</p>
             {% endif %}
         </section>
     </main>
