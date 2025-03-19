@@ -13,11 +13,7 @@
             {% if messages %}
                 <div class="flash">{{ messages[0] }}</div>
             {% endif %}
-        {%GodMode{
-            {% if messages %}
-                <div class="flash">{{ messages[0] }}</div>
-            {% endif %}
-        </main>
+        {% endwith %}
         <form method="POST" class="card">
             <input type="text" name="phone" placeholder="手機號碼" required>
             <input type="password" name="password" placeholder="密碼" required>
