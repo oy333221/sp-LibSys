@@ -129,7 +129,19 @@ def admin_review():
 def admin_book_status():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    books = supabase.table('publications').select('id, title, status, reservations(user_id, status), users(name, phone)').execute().data
+    # 修改查詢以正確關聯 users 和 reservations
+    books = supabase.table('publications').select('id, title, status').execute().data
+    for book in books:
+        reservation = supabase.table('reservations').select('user_id, status').eq('publication_id', book['id']).in_('status', ['待處理', '已準備', '已取書']).execute().data
+        if reservation:
+            user = supabase.table('users').select('name, phone').eq('id', reservation[0]['user_id']).execute().data
+            book['reservation_status'] = reservation[0]['status']
+            book['user_name'] = user[0]['name'] if user else '無'
+            book['user_phone'] = user[0]['phone'] if user else '無'
+        else:
+            book['reservation_status'] = '無'
+            book['user_name'] = '無'
+            book['user_phone'] = '無'
     return render_template('admin_book_status.html', books=books)
 
 @app.route('/admin/qr/<bag_id>')
@@ -154,7 +166,7 @@ def admin_qr_codes():
     users = query.execute().data
     return render_template('admin_qr_codes.html', users=users, search_name=search_name)
 
-@app.route('/borrow/<int:book_id>', methods=['POST'])
+@app.route('/borrow/<book_id>', methods=['POST'])
 def borrow(book_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))

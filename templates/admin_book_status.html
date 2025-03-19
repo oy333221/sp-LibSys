@@ -22,9 +22,9 @@
                     <tr>
                         <td>{{ book.title }}</td>
                         <td>{{ book.status }}</td>
-                        <td>{{ book.reservations[0].users.name if book.reservations else '無' }}</td>
-                        <td>{{ book.reservations[0].users.phone if book.reservations else '無' }}</td>
-                        <td>{{ book.reservations[0].status if book.reservations else '無' }}</td>
+                        <td>{{ book.user_name }}</td>
+                        <td>{{ book.user_phone }}</td>
+                        <td>{{ book.reservation_status }}</td>
                     </tr>
                 {% endfor %}
             </table>
