@@ -3,46 +3,38 @@
 <head>
     <title>註冊</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <div class="card">
-        <h1>用戶註冊</h1>
+    <header>
+        <h1>註冊</h1>
+    </header>
+    <main>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                {% for message in messages %}
-                    <p style="color: green;">{{ message }}</p>
-                {% endfor %}
+                <div class="flash">{{ messages[0] }}</div>
             {% endif %}
         {% endwith %}
-        
-        <form method="POST" action="{{ url_for('register') }}">
-            <label>信箱:</label>
-            <input type="email" name="email" required>
-            <label>密碼:</label>
-            <input type="password" name="password" required>
-            <label>提供的書籍（可多本）:</label>
-            <div id="isbn-fields">
-                <input type="text" name="isbn" placeholder="ISBN" required>
-                <input type="text" name="author_isbn1" placeholder="作者" required><br>
+        <form method="POST" class="card">
+            <input type="text" name="phone" placeholder="手機號碼 (09xxxxxxxx)" required>
+            <input type="password" name="password" placeholder="密碼" required>
+            <h3>提供交換的書籍</h3>
+            <div id="book-list">
+                <div class="book-entry">
+                    <input type="text" name="isbn" placeholder="ISBN">
+                    <input type="text" name="title" placeholder="書名">
+                </div>
             </div>
-            <button type="button" onclick="addIsbnField()">新增一本書</button>
+            <button type="button" onclick="addBook()">新增書籍</button>
             <input type="submit" value="提交註冊">
         </form>
-        <a href="{{ url_for('login') }}">已有帳號？登入</a>
-    </div>
-
+        <a href="{{ url_for('login') }}" class="btn">返回登入</a>
+    </main>
     <script>
-        let isbnCount = 1;
-        function addIsbnField() {
-            isbnCount++;
-            const container = document.getElementById('isbn-fields');
-            const newFields = document.createElement('div');
-            newFields.innerHTML = `
-                <input type="text" name="isbn" placeholder="ISBN" required>
-                <input type="text" name="author_isbn${isbnCount}" placeholder="作者" required><br>
-            `;
-            container.appendChild(newFields);
+        function addBook() {
+            const div = document.createElement('div');
+            div.className = 'book-entry';
+            div.innerHTML = '<input type="text" name="isbn" placeholder="ISBN"><input type="text" name="title" placeholder="書名">';
+            document.getElementById('book-list').appendChild(div);
         }
     </script>
 </body>

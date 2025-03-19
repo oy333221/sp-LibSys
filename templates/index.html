@@ -1,63 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>書籍借閱系統</title>
+    <title>書籍交換系統</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <div class="card">
-        <h1>歡迎使用書籍借閱系統</h1>
+    <header>
+        <h1>書籍交換系統</h1>
+        <nav>
+            <a href="{{ url_for('logout') }}">登出</a>
+        </nav>
+    </header>
+    <main>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                {% for message in messages %}
-                    <p style="color: green;">{{ message }}</p>
-                {% endfor %}
+                <div class="flash">{{ messages[0] }}</div>
             {% endif %}
         {% endwith %}
-        
-        {% if session.user_id %}
-            <p>已登入，歡迎！ <a href="{{ url_for('logout') }}">登出</a></p>
-        {% else %}
-            <p>未登入，請 <a href="{{ url_for('login') }}">登入</a> | <a href="{{ url_for('admin_login') }}">管理員入口</a></p>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <h2>可借書籍清單</h2>
-        {% if books %}
-            <table>
-                <tr>
-                    <th>書名</th>
-                    <th>作者</th>
-                    <th>ISBN</th>
-                    <th>描述</th>
-                    <th>連結</th>
-                    <th>操作</th>
-                </tr>
-                {% for book in books %}
-                    <tr>
-                        <td>{{ book.title }}</td>
-                        <td>{{ book.author }}</td>
-                        <td>{{ book.isbn }}</td>
-                        <td>{{ book.description or '無描述' }}</td>
-                        <td><a href="{{ book.product_link }}" target="_blank">查看</a></td>
-                        <td>
-                            <form method="POST" action="{{ url_for('borrow', book_id=book.id) }}">
-                                <button type="submit">借書</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% else %}
-            <p>目前沒有可借的書籍。</p>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <a href="{{ url_for('register') }}">前往註冊</a><br>
-        <a href="{{ url_for('add_book') }}">新增書籍</a>
-    </div>
+        <section class="card">
+            <h2>可借書籍</h2>
+            {% if books %}
+                <table>
+                    <tr><th>書名</th><th>作者</th><th>ISBN</th><th>描述</th><th>連結</th><th>操作</th></tr>
+                    {% for book in books %}
+                        <tr>
+                            <td>{{ book.title }}</td>
+                            <td>{{ book.author }}</td>
+                            <td>{{ book.isbn }}</td>
+                            <td>{{ book.description or '無描述' }}</td>
+                            <td><a href="{{ book.product_link }}" target="_blank">查看</a></td>
+                            <td>
+                                <form method="POST" action="{{ url_for('borrow', book_id=book.id) }}">
+                                    <button type="submit">借書</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>目前沒有可借書籍。</p>
+            {% endif %}
+        </section>
+        <section class="card">
+            <h2>我的預約</h2>
+            {% if reservations %}
+                <table>
+                    <tr><th>書名</th><th>ISBN</th><th>操作</th></tr>
+                    {% for res in reservations %}
+                        <tr>
+                            <td>{{ res.publications.title }}</td>
+                            <td>{{ res.publications.isbn }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('cancel_borrow', reservation_id=res.id) }}">
+                                    <button type="submit">取消</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>您目前沒有預約。</p>
+            {% endif %}
+        </section>
+        <section class="card">
+            <a href="{{ url_for('report_dropoff') }}" class="btn">交換箱報到</a>
+        </section>
+    </main>
 </body>
 </html>

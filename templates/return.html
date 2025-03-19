@@ -1,44 +1,26 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>還書</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-    <div class="card">
-        <h1>還書 - 書袋 {{ bag_id }}</h1>
+!DOCTYPE html
+html
+head
+    title還書title
+    link rel=stylesheet href={{ url_for('static', filename='style.css') }}
+head
+body
+    header
+        h1還書 - 書袋 {{ bag_id }}h1
+    header
+    main
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                {% for message in messages %}
-                    <p style="color: green;">{{ message }}</p>
-                {% endfor %}
+                div class=flash{{ messages[0] }}div
             {% endif %}
         {% endwith %}
-        
-        {% if borrowed_books %}
-            <form method="POST">
-                <table>
-                    <tr>
-                        <th>書名</th>
-                        <th>作者</th>
-                        <th>ISBN</th>
-                        <th>選擇</th>
-                    </tr>
-                    {% for book in borrowed_books %}
-                        <tr>
-                            <td>{{ book.publications.title }}</td>
-                            <td>{{ book.publications.author }}</td>
-                            <td>{{ book.publications.isbn }}</td>
-                            <td><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"></td>
-                        </tr>
-                    {% endfor %}
-                </table>
-                <input type="submit" value="確認還書">
-            </form>
-        {% else %}
-            <p>目前沒有借閱中的書籍。</p>
-        {% endif %}
-    </div>
-</body>
-</html>
+        form method=POST class=card
+            h3請選擇要還的書籍h3
+            {% for book in borrowed_books %}
+                labelinput type=checkbox name=book_ids value={{ book.publication_id }} {{ book.publications.title }} ({{ book.publications.isbn }})labelbr
+            {% endfor %}
+            input type=submit value=確認還書
+        form
+    main
+body
+html

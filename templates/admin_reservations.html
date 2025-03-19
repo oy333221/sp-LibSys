@@ -1,62 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>借閱狀態</title>
+    <title>管理員 - 借閱狀態</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <div class="card">
-        <h1>借閱狀態</h1>
+    <header>
+        <h1>管理員 - 借閱狀態</h1>
+    </header>
+    <main>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                {% for message in messages %}
-                    <p style="color: green;">{{ message }}</p>
-                {% endfor %}
+                <div class="flash">{{ messages[0] }}</div>
             {% endif %}
         {% endwith %}
-        
-        {% if session.admin %}
-            <p>管理員已登入 | 
-                <a href="{{ url_for('admin_review') }}">審核註冊</a> | 
-                <a href="{{ url_for('admin_limits') }}">設定借書上限</a> | 
-                <a href="{{ url_for('admin_books') }}">書籍狀態</a> | 
-                <a href="{{ url_for('logout') }}">登出</a>
-            </p>
-        {% endif %}
-        
-        {% if pending_reservations %}
+        <section class="card">
+            <h2>待放入書袋</h2>
             <table>
-                <tr>
-                    <th>用戶</th>
-                    <th>書袋號碼</th>
-                    <th>書名</th>
-                    <th>ISBN</th>
-                    <th>借書 QR Code</th>
-                    <th>還書 QR Code</th>
-                    <th>操作</th>
-                </tr>
-                {% for reservation in pending_reservations %}
+                <tr><th>用戶</th><th>書袋</th><th>書名</th><th>ISBN</th><th>操作</th></tr>
+                {% for res in pending_reservations %}
                     <tr>
-                        <td>{{ reservation.email }}</td>
-                        <td>{{ reservation.bag_id }}</td>
-                        <td>{{ reservation.publications.title }}</td>
-                        <td>{{ reservation.publications.isbn }}</td>
-                        <td><a href="{{ url_for('admin_show_qr', action='borrow', bag_id=reservation.bag_id) }}" target="_blank">查看</a></td>
-                        <td><a href="{{ url_for('admin_show_qr', action='return', bag_id=reservation.bag_id) }}" target="_blank">查看</a></td>
+                        <td>{{ res.users.phone }}</td>
+                        <td>{{ res.users.bag_id }}</td>
+                        <td>{{ res.publications.title }}</td>
+                        <td>{{ res.publications.isbn }}</td>
                         <td>
                             <form method="POST">
-                                <input type="hidden" name="reservation_id" value="{{ reservation.id }}">
-                                <input type="submit" value="放入書袋">
+                                <input type="hidden" name="reservation_id" value="{{ res.id }}">
+                                <input type="hidden" name="action" value="prepare">
+                                <button type="submit">確認放入</button>
                             </form>
                         </td>
                     </tr>
                 {% endfor %}
             </table>
-        {% else %}
-            <p>目前沒有待處理的借閱申請。</p>
-        {% endif %}
-        <a href="{{ url_for('admin_books') }}">返回書籍狀態</a>
-    </div>
+        </section>
+        <section class="card">
+            <h2>待重新上架</h2>
+            <table>
+                <tr><th>用戶</th><th>書袋</th><th>書名</th><th>ISBN</th><th>操作</th></tr>
+                {% for res in returned_reservations %}
+                    <tr>
+                        <td>{{ res.users.phone }}</td>
+                        <td>{{ res.users.bag_id }}</td>
+                        <td>{{ res.publications.title }}</td>
+                        <td>{{ res.publications.isbn }}</td>
+                        <td>
+                            <form method="POST">
+                                <input type="hidden" name="reservation_id" value="{{ res.id }}">
+                                <input type="hidden" name="action" value="re-shelf">
+                                <button type="submit">重新上架</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </section>
+        <a href="{{ url_for('admin_review') }}" class="btn">返回審核</a>
+    </main>
 </body>
 </html>

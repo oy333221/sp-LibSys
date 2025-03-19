@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>取書確認</title>
+    <title>交換箱報到</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header>
-        <h1>取書確認 - 書袋 {{ bag_id }}</h1>
+        <h1>交換箱報到</h1>
     </header>
     <main>
         {% with messages = get_flashed_messages() %}
@@ -15,11 +15,11 @@
             {% endif %}
         {% endwith %}
         <form method="POST" class="card">
-            <h3>請確認以下書籍</h3>
+            <h3>請勾選已放入交換箱的書籍</h3>
             {% for book in pending_books %}
-                <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }} ({{ book.publications.isbn }})</label><br>
+                <label><input type="checkbox" name="book_ids" value="{{ book.id }}"> {{ book.title }} ({{ book.isbn }})</label><br>
             {% endfor %}
-            <input type="submit" value="確認取書">
+            <input type="submit" value="確認放入">
         </form>
         <a href="{{ url_for('index') }}" class="btn">返回首頁</a>
     </main>

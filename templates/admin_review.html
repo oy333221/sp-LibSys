@@ -1,62 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>審核註冊</title>
+    <title>管理員 - 審核</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <div class="card">
-        <h1>審核註冊申請</h1>
+    <header>
+        <h1>管理員 - 審核</h1>
+    </header>
+    <main>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                {% for message in messages %}
-                    <p style="color: green;">{{ message }}</p>
-                {% endfor %}
+                <div class="flash">{{ messages[0] }}</div>
             {% endif %}
         {% endwith %}
-        
-        {% if session.admin %}
-            <p>管理員已登入 | 
-                <a href="{{ url_for('admin_limits') }}">設定借書上限</a> | 
-                <a href="{{ url_for('admin_books') }}">書籍狀態</a> | 
-                <a href="{{ url_for('admin_login') }}">登出</a>
-            </p>
-        {% else %}
-            <p>未登入，請 <a href="{{ url_for('admin_login') }}">輸入密鑰</a></p>
-        {% endif %}
-        
-        {% if pending_users %}
-            <table>
-                <tr>
-                    <th>信箱</th>
-                    <th>書袋號碼</th>
-                    <th>待審書籍</th>
-                    <th>操作</th>
-                </tr>
-                {% for user in pending_users %}
-                    <tr>
-                        <td>{{ user.email }}</td>
-                        <td>{{ user.bag_id }}</td>
-                        <td>
-                            {% for book in user.pending_books %}
-                                ISBN: {{ book.isbn }}, 作者: {{ book.author }}<br>
-                            {% endfor %}
-                        </td>
-                        <td>
-                            <form method="POST" action="{{ url_for('admin_review') }}">
-                                <input type="hidden" name="user_id" value="{{ user.id }}">
-                                <button type="submit" name="action" value="approve">通過</button>
-                                <button type="submit" name="action" value="reject">拒絕</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% else %}
-            <p>目前沒有待審核的申請。</p>
-        {% endif %}
-        <a href="{{ url_for('login') }}">返回用戶登入</a>
-    </div>
+        {% for user in pending_users %}
+            <section class="card">
+                <h3>用戶: {{ user.phone }} ({{ user.bag_id }})</h3>
+                <table>
+                    <tr><th>書名</th><th>ISBN</th><th>狀態</th></tr>
+                    {% for book in user.pending_books %}
+                        <tr>
+                            <td>{{ book.title }}</td>
+                            <td>{{ book.isbn }}</td>
+                            <td>{{ book.status }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+                <form method="POST">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" name="action" value="approve">通過</button>
+                    <button type="submit" name="action" value="reject">拒絕</button>
+                    <a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" class="btn" target="_blank">生成 QR Code</a>
+                </form>
+            </section>
+        {% endfor %}
+        <a href="{{ url_for('admin_books') }}" class="btn">查看書籍狀態</a>
+        <a href="{{ url_for('admin_reservations') }}" class="btn">查看借閱狀態</a>
+    </main>
 </body>
 </html>
