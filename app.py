@@ -4,7 +4,6 @@ import bcrypt
 import qrcode
 from io import BytesIO
 import os
-import uuid
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -24,10 +23,6 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        # 移除過嚴格的 token 檢查，改用簡單防重複提交
-        if session.get('just_registered'):
-            flash("請勿重複提交！")
-            return redirect(url_for('register'))
         phone = request.form['phone']
         password = request.form['password']
         name = request.form['name']
@@ -48,22 +43,23 @@ def register():
         books = request.form.getlist('books[]')
         for book in books:
             if book:
-                isbn, title = book.split('|', 1)
-                existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
-                if existing_book.data:
-                    flash(f"ISBN {isbn} 已存在！")
-                else:
-                    supabase.table('pending_books').insert({
-                        'isbn': isbn,
-                        'title': title,
-                        'author': '未知作者',
-                        'owner_id': new_user['id'],
-                        'status': '待審核'
-                    }).execute()
-        session['just_registered'] = True  # 標記已提交
+                try:
+                    isbn, title = book.split('|', 1)
+                    existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
+                    if existing_book.data:
+                        flash(f"ISBN {isbn} 已存在！")
+                    else:
+                        supabase.table('pending_books').insert({
+                            'isbn': isbn,
+                            'title': title,
+                            'author': '未知作者',
+                            'owner_id': new_user['id'],
+                            'status': '待審核'
+                        }).execute()
+                except ValueError:
+                    flash(f"書籍格式錯誤：{book}，應為 ISBN|書名")
         flash("註冊成功，請等待審核！")
         return redirect(url_for('login'))
-    session.pop('just_registered', None)  # 重置標記
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -94,7 +90,6 @@ def login():
 def logout():
     session.pop('user_id', None)
     session.pop('admin', None)
-    session.pop('just_registered', None)
     return redirect(url_for('login'))
 
 @app.route('/admin', methods=['GET', 'POST'])
@@ -181,7 +176,7 @@ def admin_show_qr(bag_id):
 def admin_qr_codes():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    search_name = request.form.get('search_name', '') if request.methoderef='POST' else ''
+    search_name = request.form.get('search_name', '') if request.method == 'POST' else ''
     query = supabase.table('users').select('id, phone, name, bag_id')
     if search_name:
         query = query.ilike('name', f'%{search_name}%')

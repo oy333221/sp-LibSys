@@ -3,6 +3,7 @@
 <head>
     <title>註冊</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
         function addBookField() {
             const container = document.getElementById('books-container');
@@ -35,7 +36,7 @@
                     <input type="text" name="books[]" placeholder="ISBN|書名（例如：9780143127550|火星任務，可選）">
                 </div>
             </div>
-            <button type="button" onclick="addBookField()">新增書籍</button>
+            <button type="button" class="add-book-btn" onclick="addBookField()">新增書籍</button>
             <input type="submit" value="註冊">
         </form>
         <a href="{{ url_for('login') }}" class="btn">已有帳號？登入</a>

@@ -1,72 +1,59 @@
-/* 重置樣式 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
-
 body {
-    font-family: 'Inter', sans-serif; /* 現代流行字體 */
-    background: #FFF7ED; /* 溫暖米白背景 */
-    color: #2D3748; /* 深炭灰文字 */
+    font-family: 'Inter', sans-serif;
+    background: #FFF7ED;
+    color: #2D3748;
     line-height: 1.6;
 }
-
-/* 引入 Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
 header {
-    background: #FFFFFF; /* 純白頭部 */
+    background: #FFFFFF;
     padding: 1.5rem;
     text-align: center;
-    border-bottom: 1px solid #E5E7EB; /* 淺灰邊線 */
+    border-bottom: 1px solid #E5E7EB;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
-
 h1, h2, h3 {
-    color: #2D3748; /* 深炭灰標題 */
+    color: #2D3748;
     font-weight: 600;
     margin-bottom: 1rem;
 }
-
 nav {
     margin-top: 0.5rem;
 }
-
 nav a {
-    color: #4B5563; /* 中灰導航 */
+    color: #4B5563;
     text-decoration: none;
     margin: 0 1rem;
     font-size: 1rem;
     transition: color 0.3s ease;
 }
-
 nav a:hover {
-    color: #F97316; /* 珊瑚橘懸停 */
+    color: #F97316;
 }
-
 main {
     max-width: 1000px;
-    margin: 2.5rem auto;
+    margin: 2rem auto;
     padding: 0 1rem;
 }
-
 .card {
     background: #FFFFFF;
-    padding: 2rem;
+    padding: 1.5rem;
     border-radius: 12px;
     margin-bottom: 2rem;
-    border: 1px solid #E5E7EB; /* 淺灰邊框 */
+    border: 1px solid #E5E7EB;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     transition: box-shadow 0.3s ease;
 }
-
 .card:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1); /* 懸停陰影加深 */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
-
 .flash {
-    background: #F97316; /* 珊瑚橘提示 */
+    background: #F97316;
     color: #FFFFFF;
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
@@ -74,69 +61,79 @@ main {
     text-align: center;
     font-weight: 500;
 }
-
 table {
     width: 100%;
     border-collapse: collapse;
     background: #FFFFFF;
 }
-
 th, td {
     padding: 1rem;
     text-align: left;
     border-bottom: 1px solid #E5E7EB;
 }
-
 th {
-    background: #F9FAFB; /* 極淺灰表頭 */
+    background: #F9FAFB;
     color: #2D3748;
     font-weight: 600;
 }
-
 form {
     display: flex;
     flex-direction: column;
-    gap: 1.2rem;
+    gap: 1rem;
 }
-
 input[type="text"], input[type="password"] {
     padding: 0.75rem;
-    border: 1px solid #D1D5DB; /* 淺灰邊框 */
+    border: 1px solid #D1D5DB;
     border-radius: 8px;
     background: #FFFFFF;
     color: #2D3748;
     width: 100%;
+    font-size: 1rem;
     transition: border-color 0.3s ease;
 }
-
 input[type="text"]:focus, input[type="password"]:focus {
     outline: none;
-    border-color: #F97316; /* 珊瑚橘聚焦 */
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1); /* 聚焦光暈 */
+    border-color: #F97316;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
-
-.book-entry {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
 button, input[type="submit"] {
-    background: #F97316; /* 珊瑚橘按鈕 */
+    background: #F97316;
     color: #FFFFFF;
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    font-size: 1rem;
     transition: background 0.3s ease, transform 0.2s ease;
 }
-
 button:hover, input[type="submit"]:hover {
-    background: #EA580C; /* 稍深珊瑚橘懸停 */
-    transform: translateY(-2px); /* 微抬效果 */
+    background: #EA580C;
+    transform: translateY(-2px);
 }
-
+.add-book-btn {
+    background: #4B5563;
+    margin: 0.5rem 0;
+}
+.add-book-btn:hover {
+    background: #2D3748;
+}
+.book-entry {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.book-entry input {
+    flex: 1;
+}
+.book-entry button {
+    background: #EF4444;
+    padding: 0.5rem 1rem;
+}
+.book-entry button:hover {
+    background: #DC2626;
+}
 .btn {
     display: inline-block;
     background: #F97316;
@@ -147,27 +144,41 @@ button:hover, input[type="submit"]:hover {
     font-weight: 500;
     transition: background 0.3s ease, transform 0.2s ease;
 }
-
 .btn:hover {
     background: #EA580C;
     transform: translateY(-2px);
     text-decoration: none;
     color: #FFFFFF;
 }
-
-/* RWD */
 @media (max-width: 600px) {
     main {
         padding: 0 0.5rem;
     }
     .card {
-        padding: 1.5rem;
+        padding: 1rem;
     }
     th, td {
         padding: 0.75rem;
         font-size: 0.9rem;
     }
+    form {
+        gap: 0.75rem;
+    }
+    input[type="text"], input[type="password"] {
+        font-size: 0.95rem;
+    }
+    button, input[type="submit"], .btn {
+        width: 100%;
+        padding: 0.75rem;
+    }
+    .add-book-btn {
+        width: 100%;
+    }
     .book-entry {
         flex-direction: column;
+        align-items: stretch;
+    }
+    .book-entry button {
+        width: 100%;
     }
 }
