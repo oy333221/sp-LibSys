@@ -6,54 +6,64 @@
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    line-height: 1.6;
+    font-family: 'Georgia', serif; /* 復古字體 */
+    background: #F8F1E9; /* 白色背景 */
+    color: #8B5E3C; /* 柔和棕色文字 */
+    line-height: 1.8;
 }
 
 header {
-    background: linear-gradient(90deg, #1e3a8a, #3b82f6);
-    padding: 1rem;
+    background: #A68A64; /* 奶茶色 */
+    padding: 1.5rem;
     text-align: center;
+    border-bottom: 2px solid #D8A7B1; /* 玫瑰粉邊線 */
 }
 
 h1, h2, h3 {
-    color: #fff;
+    color: #8B5E3C; /* 柔和棕色標題 */
+    font-weight: normal;
     margin-bottom: 1rem;
+    position: relative;
 }
 
-nav {
-    margin-top: 0.5rem;
+h1::after, h2::after {
+    content: ''; /* 幾何山丘線條 */
+    display: block;
+    width: 50px;
+    height: 2px;
+    background: #D8A7B1; /* 玫瑰粉 */
+    margin: 0.5rem auto;
+    border-radius: 2px;
 }
 
 nav a {
-    color: #fff;
+    color: #F8F1E9; /* 白色導航 */
     text-decoration: none;
     margin: 0 1rem;
+    font-size: 1.1rem;
 }
 
 nav a:hover {
-    text-decoration: underline;
+    color: #D8A7B1; /* 玫瑰粉懸停 */
 }
 
 main {
-    max-width: 1200px;
+    max-width: 900px; /* 極簡窄布局 */
     margin: 2rem auto;
     padding: 0 1rem;
 }
 
 .card {
-    background: #1e293b;
+    background: #F5E8C7; /* 溫暖米色卡片 */
     padding: 1.5rem;
-    border-radius: 12px;
+    border-radius: 12px; /* 圓形構圖 */
     margin-bottom: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #A68A64; /* 奶茶色邊框 */
 }
 
 .flash {
-    background: #22c55e;
-    color: #fff;
+    background: #D8A7B1; /* 玫瑰粉提示 */
+    color: #F8F1E9;
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -63,23 +73,18 @@ main {
 table {
     width: 100%;
     border-collapse: collapse;
-    background: #334155;
-    border-radius: 8px;
-    overflow: hidden;
+    background: #F8F1E9; /* 白色表格 */
 }
 
 th, td {
     padding: 1rem;
     text-align: left;
+    border-bottom: 1px dashed #A68A64; /* 奶茶色虛線 */
 }
 
 th {
-    background: #475569;
-    color: #fff;
-}
-
-td {
-    border-bottom: 1px solid #4b5563;
+    background: #A68A64; /* 奶茶色表頭 */
+    color: #F8F1E9;
 }
 
 form {
@@ -90,16 +95,16 @@ form {
 
 input[type="text"], input[type="password"] {
     padding: 0.75rem;
-    border: 1px solid #4b5563;
+    border: 1px solid #A68A64; /* 奶茶色邊框 */
     border-radius: 8px;
-    background: #334155;
-    color: #e2e8f0;
+    background: #F8F1E9; /* 白色輸入框 */
+    color: #8B5E3C;
     width: 100%;
 }
 
 input[type="text"]:focus, input[type="password"]:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: #D8A7B1; /* 玫瑰粉聚焦 */
 }
 
 .book-entry {
@@ -109,30 +114,31 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 
 button, input[type="submit"] {
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
-    color: #fff;
+    background: #D8A7B1; /* 玫瑰粉按鈕 */
+    color: #F8F1E9;
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: background 0.3s ease;
 }
 
 button:hover, input[type="submit"]:hover {
-    transform: translateY(-2px);
+    background: #8B5E3C; /* 柔和棕色懸停 */
 }
 
 .btn {
     display: inline-block;
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
-    color: #fff;
+    background: #D8A7B1;
+    color: #F8F1E9;
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     text-decoration: none;
+    transition: background 0.3s ease;
 }
 
 .btn:hover {
-    transform: translateY(-2px);
+    background: #8B5E3C;
     text-decoration: none;
 }
 
