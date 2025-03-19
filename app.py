@@ -30,8 +30,6 @@ def register():
         phone = request.form['phone']
         password = request.form['password']
         name = request.form['name']
-        isbn = request.form['isbn']
-        title = request.form['title']
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         existing_user = supabase.table('users').select('phone').eq('phone', phone).execute()
         if existing_user.data:
@@ -46,17 +44,22 @@ def register():
             'status': '待審核',
             'max_borrow': 2
         }).execute().data[0]
-        existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
-        if existing_book.data:
-            flash(f"ISBN {isbn} 已存在！")
-        else:
-            supabase.table('pending_books').insert({
-                'isbn': isbn,
-                'title': title,
-                'author': '未知作者',
-                'owner_id': new_user['id'],
-                'status': '待審核'
-            }).execute()
+        # 處理多本書（可選）
+        books = request.form.getlist('books[]')  # 從動態表單獲取書籍資料
+        for book in books:
+            if book:  # 確保不為空
+                isbn, title = book.split('|', 1)  # 假設格式為 "isbn|title"
+                existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
+                if existing_book.data:
+                    flash(f"ISBN {isbn} 已存在！")
+                else:
+                    supabase.table('pending_books').insert({
+                        'isbn': isbn,
+                        'title': title,
+                        'author': '未知作者',
+                        'owner_id': new_user['id'],
+                        'status': '待審核'
+                    }).execute()
         session['register_token'] = request.form.get('token')
         flash("註冊成功，請等待審核！")
         return redirect(url_for('login'))
@@ -129,7 +132,6 @@ def admin_review():
 def admin_book_status():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    # 修改查詢以正確關聯 users 和 reservations
     books = supabase.table('publications').select('id, title, status').execute().data
     for book in books:
         reservation = supabase.table('reservations').select('user_id, status').eq('publication_id', book['id']).in_('status', ['待處理', '已準備', '已取書']).execute().data
@@ -143,6 +145,18 @@ def admin_book_status():
             book['user_name'] = '無'
             book['user_phone'] = '無'
     return render_template('admin_book_status.html', books=books)
+
+@app.route('/admin/reservations', methods=['GET', 'POST'])
+def admin_reservations():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+    if request.method == 'POST':
+        reservation_id = request.form['reservation_id']
+        supabase.table('reservations').update({'status': '已準備'}).eq('id', reservation_id).execute()
+        flash("書籍已放入書袋！")
+        return redirect(url_for('admin_reservations'))
+    pending_reservations = supabase.table('reservations').select('id, publication_id, users(name, phone), publications(title)').eq('status', '待處理').execute().data
+    return render_template('admin_reservations.html', reservations=pending_reservations)
 
 @app.route('/admin/qr/<bag_id>')
 def admin_show_qr(bag_id):
@@ -222,7 +236,7 @@ def borrow_checkin(bag_id):
             flash("已確認取書，您可以帶走書籍了！")
         elif action == 'return':
             for book_id in book_ids:
-                reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).in_('status', ['待處理', '已取書']).execute().data
+                reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', '已取書').execute().data  # 只允許已取書狀態還書
                 if reservation:
                     supabase.table('reservations').update({'status': '已歸還'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
                     supabase.table('publications').update({'status': '可借閱'}).eq('id', book_id).execute()
@@ -230,7 +244,7 @@ def borrow_checkin(bag_id):
         return redirect(url_for('index'))
 
     pending_books = supabase.table('reservations').select('publication_id, publications(title, author)').eq('user_id', user_id).eq('status', '已準備').execute().data
-    borrowed_books = supabase.table('reservations').select('publication_id, publications(title, author)').eq('user_id', user_id).in_('status', ['待處理', '已取書']).execute().data
+    borrowed_books = supabase.table('reservations').select('publication_id, publications(title, author)').eq('user_id', user_id).eq('status', '已取書').execute().data  # 只顯示已取書
     return render_template('borrow_checkin.html', pending_books=pending_books, borrowed_books=borrowed_books, bag_id=bag_id)
 
 if __name__ == '__main__':

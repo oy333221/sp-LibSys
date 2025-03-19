@@ -3,6 +3,18 @@
 <head>
     <title>註冊</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        function addBookField() {
+            const container = document.getElementById('books-container');
+            const div = document.createElement('div');
+            div.className = 'book-entry';
+            div.innerHTML = `
+                <input type="text" name="books[]" placeholder="ISBN|書名（例如：9780143127550|火星任務）">
+                <button type="button" onclick="this.parentElement.remove()">移除</button>
+            `;
+            container.appendChild(div);
+        }
+    </script>
 </head>
 <body>
     <header>
@@ -19,8 +31,12 @@
             <input type="text" name="name" placeholder="姓名" required>
             <input type="text" name="phone" placeholder="手機號碼" required>
             <input type="password" name="password" placeholder="密碼" required>
-            <input type="text" name="isbn" placeholder="書籍 ISBN" required>
-            <input type="text" name="title" placeholder="書籍標題" required>
+            <div id="books-container">
+                <div class="book-entry">
+                    <input type="text" name="books[]" placeholder="ISBN|書名（例如：9780143127550|火星任務，可選）">
+                </div>
+            </div>
+            <button type="button" onclick="addBookField()">新增書籍</button>
             <input type="submit" value="註冊">
         </form>
         <a href="{{ url_for('login') }}" class="btn">已有帳號？登入</a>
