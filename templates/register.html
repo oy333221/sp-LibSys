@@ -1,45 +1,44 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>註冊</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script>
-        function addBookField() {
-            const container = document.getElementById('books-container');
-            const div = document.createElement('div');
-            div.className = 'book-entry';
-            div.innerHTML = `
-                <input type="text" name="books[]" placeholder="ISBN|書名（例如：9780143127550|火星任務）">
-                <button type="button" onclick="this.parentElement.remove()">移除</button>
-            `;
-            container.appendChild(div);
-        }
-    </script>
-</head>
-<body>
-    <header>
-        <h1>註冊</h1>
-    </header>
-    <main>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash">{{ messages[0] }}</div>
-            {% endif %}
-        {% endwith %}
-        <form method="POST" class="card">
-            <input type="text" name="name" placeholder="姓名" required>
-            <input type="text" name="phone" placeholder="手機號碼" required>
-            <input type="password" name="password" placeholder="密碼" required>
-            <div id="books-container">
-                <div class="book-entry">
-                    <input type="text" name="books[]" placeholder="ISBN|書名（例如：9780143127550|火星任務，可選）">
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">註冊</h2>
+                    <form method="POST">
+                        <div class="form-group">
+                            <label for="phone">手機號碼</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   pattern="09[0-9]{8}" required>
+                            <small class="form-text text-muted">請輸入台灣手機號碼（例：0912345678）</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="name">姓名</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">密碼</label>
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   minlength="8" required>
+                            <small class="form-text text-muted">密碼長度至少8個字元</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="isbns">書籍 ISBN（選填）</label>
+                            <textarea class="form-control" id="isbns" name="isbns" rows="4"
+                                    placeholder="每行輸入一個 ISBN&#10;例如：&#10;9789571313023&#10;9789863208785"></textarea>
+                            <small class="form-text text-muted">如果要分享書籍，請輸入 ISBN，每行一個</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block">註冊</button>
+                    </form>
                 </div>
             </div>
-            <button type="button" class="add-book-btn" onclick="addBookField()">新增書籍</button>
-            <input type="submit" value="註冊">
-        </form>
-        <a href="{{ url_for('login') }}" class="btn">已有帳號？登入</a>
-    </main>
-</body>
-</html>
+        </div>
+    </div>
+</div>
+{% endblock %}

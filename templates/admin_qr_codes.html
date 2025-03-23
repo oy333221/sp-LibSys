@@ -18,14 +18,28 @@
             <input type="text" name="search_name" placeholder="搜尋用戶姓名" value="{{ search_name }}">
             <input type="submit" value="搜尋">
         </form>
-        {% for user in users %}
-            <section class="card">
-                <h3>用戶: {{ user.name }} ({{ user.phone }}) - {{ user.bag_id }}</h3>
-                <a href="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" target="_blank">
-                    <img src="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" alt="QR Code">
-                </a>
-            </section>
-        {% endfor %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>電話</th>
+                    <th>書袋ID</th>
+                    <th>QR Code</th>
+                    <th>借書網址</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.phone }}</td>
+                    <td>{{ user.bag_id }}</td>
+                    <td><img src="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" width="100"></td>
+                    <td><a href="{{ user.borrow_url }}" target="_blank">{{ user.borrow_url }}</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </main>
 </body>
 </html>

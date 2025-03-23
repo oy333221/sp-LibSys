@@ -26,40 +26,70 @@ def register():
         phone = request.form['phone']
         password = request.form['password']
         name = request.form['name']
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        
+        # 基本驗證
+        if not phone or not password or not name:
+            flash("必填欄位不能為空！")
+            return redirect(url_for('register'))
+        
+        # 檢查手機號碼格式
+        if not phone.isdigit() or len(phone) != 10 or not phone.startswith('09'):
+            flash("請輸入有效的手機號碼！")
+            return redirect(url_for('register'))
+
+        # 檢查手機號碼是否已被註冊
         existing_user = supabase.table('users').select('phone').eq('phone', phone).execute()
         if existing_user.data:
             flash("此手機號碼已被註冊！")
             return redirect(url_for('register'))
-        bag_id = f"BAG_{phone}_{os.urandom(4).hex()}"
-        new_user = supabase.table('users').insert({
-            'phone': phone,
-            'password': hashed_password.decode('utf-8'),
-            'name': name,
-            'bag_id': bag_id,
-            'status': '待審核',
-            'max_borrow': 2
-        }).execute().data[0]
-        books = request.form.getlist('books[]')
-        for book in books:
-            if book:
-                try:
-                    isbn, title = book.split('|', 1)
-                    existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
-                    if existing_book.data:
-                        flash(f"ISBN {isbn} 已存在！")
-                    else:
+
+        # 建立新用戶
+        try:
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            bag_id = f"BAG_{phone}_{os.urandom(4).hex()}"
+            new_user = supabase.table('users').insert({
+                'phone': phone,
+                'password': hashed_password.decode('utf-8'),
+                'name': name,
+                'bag_id': bag_id,
+                'status': '待審核',
+                'max_borrow': 2
+            }).execute().data[0]
+
+            # 處理書籍 ISBN
+            isbns = request.form.get('isbns', '').strip().split('\n')
+            for isbn in isbns:
+                isbn = isbn.strip()
+                if isbn:  # 只處理非空的 ISBN
+                    try:
+                        # 檢查 ISBN 是否已存在
+                        existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
+                        if existing_book.data:
+                            flash(f"ISBN {isbn} 已存在於系統中")
+                            continue
+                        
+                        # 新增到待處理書籍
                         supabase.table('pending_books').insert({
                             'isbn': isbn,
-                            'title': title,
-                            'author': '未知作者',
                             'owner_id': new_user['id'],
                             'status': '待審核'
                         }).execute()
-                except ValueError:
-                    flash(f"書籍格式錯誤：{book}，應為 ISBN|書名")
-        flash("註冊成功，請等待審核！")
-        return redirect(url_for('login'))
+                        
+                        # 立即觸發爬蟲更新書籍資訊
+                        from scraper import update_pending_book
+                        update_pending_book(isbn)
+                        
+                    except Exception as e:
+                        flash(f"處理 ISBN {isbn} 時發生錯誤")
+                        continue
+
+            flash("註冊成功，請等待審核！")
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            flash("註冊過程發生錯誤，請稍後再試！")
+            return redirect(url_for('register'))
+
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -135,18 +165,54 @@ def admin_review():
 def admin_book_status():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
-    books = supabase.table('publications').select('id, title, status').execute().data
+    
+    # 修正查詢語法
+    books = supabase.table('publications')\
+        .select('''
+            *,
+            owner:users!publications_owner_id_fkey (
+                name,
+                phone
+            )
+        ''')\
+        .execute().data
+
     for book in books:
-        reservation = supabase.table('reservations').select('user_id, status').eq('publication_id', book['id']).in_('status', ['待處理', '已準備', '已取書']).execute().data
+        # 獲取最新的未完成預約/借閱記錄
+        reservation = supabase.table('reservations')\
+            .select('''
+                *,
+                borrower:users!reservations_user_id_fkey (
+                    name,
+                    phone
+                )
+            ''')\
+            .eq('publication_id', book['id'])\
+            .in_('status', ['待處理', '已準備', '已取書'])\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute().data
+
+        # 設置預設值
+        book['current_status'] = '可借閱'
+        book['status_description'] = '在架上可借閱'
+        book['borrower_name'] = '-'
+        book['borrower_phone'] = '-'
+
         if reservation:
-            user = supabase.table('users').select('name, phone').eq('id', reservation[0]['user_id']).execute().data
-            book['reservation_status'] = reservation[0]['status']
-            book['user_name'] = user[0]['name'] if user else '無'
-            book['user_phone'] = user[0]['phone'] if user else '無'
-        else:
-            book['reservation_status'] = '無'
-            book['user_name'] = '無'
-            book['user_phone'] = '無'
+            reservation = reservation[0]
+            book['current_status'] = reservation['status']
+            
+            if reservation['status'] == '待處理':
+                book['status_description'] = '已申請借閱，待管理員放入書袋'
+            elif reservation['status'] == '已準備':
+                book['status_description'] = '已放入書袋，待用戶取書'
+            elif reservation['status'] == '已取書':
+                book['status_description'] = '用戶已取出，待歸還'
+            
+            book['borrower_name'] = reservation['borrower']['name']
+            book['borrower_phone'] = reservation['borrower']['phone']
+
     return render_template('admin_book_status.html', books=books)
 
 @app.route('/admin/reservations', methods=['GET', 'POST'])
@@ -181,6 +247,8 @@ def admin_qr_codes():
     if search_name:
         query = query.ilike('name', f'%{search_name}%')
     users = query.execute().data
+    for user in users:
+        user['borrow_url'] = url_for('borrow_checkin', bag_id=user['bag_id'], _external=True)
     return render_template('admin_qr_codes.html', users=users, search_name=search_name)
 
 @app.route('/borrow/<book_id>', methods=['POST'])
