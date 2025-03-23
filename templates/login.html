@@ -1,26 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>登入</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <header>
-        <h1>登入</h1>
-    </header>
-    <main>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash">{{ messages[0] }}</div>
-            {% endif %}
-        {% endwith %}
-        <form method="POST" class="card">
-            <input type="text" name="phone" placeholder="手機號碼" required>
-            <input type="password" name="password" placeholder="密碼" required>
-            <input type="submit" value="登入">
-        </form>
-        <a href="{{ url_for('register') }}" class="btn">沒有帳號？註冊</a>
-        <a href="{{ url_for('admin_login') }}" class="btn">管理員登入</a>
-    </main>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block navbar %}
+{% if session.get('qr_mode') %}
+<nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container">
+        <span class="navbar-brand">書籍借還系統</span>
+    </div>
+</nav>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">
+                    <i class="fas fa-sign-in-alt mr-2"></i>使用者登入
+                </h2>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="phone">手機號碼</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密碼</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">登入</button>
+                </form>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('register') }}">還沒有帳號？立即註冊</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

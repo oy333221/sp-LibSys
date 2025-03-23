@@ -1,24 +1,20 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>管理員登入</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <header>
-        <h1>管理員登入</h1>
-    </header>
-    <main>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash">{{ messages[0] }}</div>
-            {% endif %}
-        {% endwith %}
-        <form method="POST" action="{{ url_for('admin_login') }}" class="card">
-            <input type="password" name="password" placeholder="密碼" required>
-            <input type="submit" value="登入">
-        </form>
-        <a href="{{ url_for('login') }}" class="btn">返回用戶登入</a>
-    </main>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">管理員登入</h2>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="password">管理員密碼</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">登入</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -4,47 +4,104 @@ import bcrypt
 import qrcode
 from io import BytesIO
 import os
+from functools import wraps
+import requests
+from datetime import datetime, timedelta
+import time
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.urandom(24)
 
 supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
 supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
 supabase: Client = create_client(supabase_url, supabase_key)
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 檢查是否在 QR code 模式
+        if session.get('qr_mode'):
+            return redirect(url_for('borrow_checkin', bag_id=session.get('bag_id')))
+        # 檢查是否是管理員
+        if 'admin' not in session:
+            flash('請先登入管理員帳號！')
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    books = supabase.table('publications').select('id, title, description, product_link, status').eq('status', '可借閱').execute().data
-    reservations = supabase.table('reservations').select('id, publication_id, publications(title), status').eq('user_id', session['user_id']).in_('status', ['待處理', '已準備', '已取書']).execute().data
+    
+    books = supabase.table('publications')\
+        .select('id, title, description, product_link, status')\
+        .eq('status', '可借閱')\
+        .execute().data
+    
+    # 處理空描述
+    for book in books:
+        if book['description'] is None:
+            book['description'] = '無描述'
+
+    reservations = supabase.table('reservations')\
+        .select('id, publication_id, publications(title), status')\
+        .eq('user_id', session['user_id'])\
+        .in_('status', ['待處理', '已準備', '已取書'])\
+        .execute().data
+    
     return render_template('index.html', books=books, reservations=reservations)
+
+def process_book_info(isbn, owner_id):
+    """立即處理書籍資訊"""
+    try:
+        # 先新增基本資訊到 pending_books
+        pending_book = supabase.table('pending_books').insert({
+            'isbn': isbn,
+            'owner_id': owner_id,
+            'status': '待審核',
+            'title': '處理中...'
+        }).execute().data[0]
+
+        # 立即爬取資訊
+        url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
+        response = requests.get(url)
+        if response.status_code == 200 and response.json()['totalItems'] > 0:
+            book = response.json()['items'][0]['volumeInfo']
+            # 更新書籍資訊
+            supabase.table('pending_books').update({
+                'title': book.get('title', '未知書名'),
+                'author': ', '.join(book.get('authors', ['未知作者'])),
+                'description': book.get('description', '無描述'),
+                'product_link': f"https://books.google.com/books?isbn={isbn}"
+            }).eq('id', pending_book['id']).execute()
+            return True
+        else:
+            # 如果找不到資訊，設置預設值
+            supabase.table('pending_books').update({
+                'title': f'未找到資訊的書籍 (ISBN: {isbn})',
+                'author': '未知作者',
+                'description': '無法從 Google Books 找到此書資訊'
+            }).eq('id', pending_book['id']).execute()
+            return False
+    except Exception as e:
+        print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")
+        return False
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        phone = request.form['phone']
+        phone = request.form['phone'].strip()
         password = request.form['password']
-        name = request.form['name']
+        name = request.form['name'].strip()
         
         # 基本驗證
         if not phone or not password or not name:
             flash("必填欄位不能為空！")
             return redirect(url_for('register'))
         
-        # 檢查手機號碼格式
-        if not phone.isdigit() or len(phone) != 10 or not phone.startswith('09'):
-            flash("請輸入有效的手機號碼！")
-            return redirect(url_for('register'))
-
-        # 檢查手機號碼是否已被註冊
-        existing_user = supabase.table('users').select('phone').eq('phone', phone).execute()
-        if existing_user.data:
-            flash("此手機號碼已被註冊！")
-            return redirect(url_for('register'))
-
-        # 建立新用戶
         try:
+            # 建立新用戶
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             bag_id = f"BAG_{phone}_{os.urandom(4).hex()}"
             new_user = supabase.table('users').insert({
@@ -60,33 +117,14 @@ def register():
             isbns = request.form.get('isbns', '').strip().split('\n')
             for isbn in isbns:
                 isbn = isbn.strip()
-                if isbn:  # 只處理非空的 ISBN
-                    try:
-                        # 檢查 ISBN 是否已存在
-                        existing_book = supabase.table('publications').select('isbn').eq('isbn', isbn).execute()
-                        if existing_book.data:
-                            flash(f"ISBN {isbn} 已存在於系統中")
-                            continue
-                        
-                        # 新增到待處理書籍
-                        supabase.table('pending_books').insert({
-                            'isbn': isbn,
-                            'owner_id': new_user['id'],
-                            'status': '待審核'
-                        }).execute()
-                        
-                        # 立即觸發爬蟲更新書籍資訊
-                        from scraper import update_pending_book
-                        update_pending_book(isbn)
-                        
-                    except Exception as e:
-                        flash(f"處理 ISBN {isbn} 時發生錯誤")
-                        continue
+                if isbn:
+                    process_book_info(isbn, new_user['id'])
 
             flash("註冊成功，請等待審核！")
             return redirect(url_for('login'))
             
         except Exception as e:
+            print(f"Registration error: {str(e)}")  # 調試用
             flash("註冊過程發生錯誤，請稍後再試！")
             return redirect(url_for('register'))
 
@@ -98,9 +136,11 @@ def login():
         phone = request.form['phone']
         password = request.form['password']
         user = supabase.table('users').select('id, phone, password, status').eq('phone', phone).execute().data
+        
         if not user:
             flash("手機號碼不存在！")
             return redirect(url_for('login'))
+        
         try:
             if not bcrypt.checkpw(password.encode('utf-8'), user[0]['password'].encode('utf-8')):
                 flash("密碼錯誤！")
@@ -108,34 +148,40 @@ def login():
         except ValueError:
             flash("密碼驗證失敗，請聯繫管理員！")
             return redirect(url_for('login'))
+            
         if user[0]['status'] != '已通過':
             flash("您的帳號尚未通過審核！")
             return redirect(url_for('login'))
+            
         session['user_id'] = user[0]['id']
-        redirect_url = session.pop('redirect_after_login', url_for('index'))
-        return redirect(redirect_url)
+        return redirect(url_for('index'))
+        
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
-    session.pop('admin', None)
+    session.clear()
     return redirect(url_for('login'))
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_login():
+    # 如果在 QR code 模式，直接重定向回借還書頁面
+    if session.get('qr_mode'):
+        return redirect(url_for('borrow_checkin', bag_id=session.get('bag_id')))
+    if 'admin' in session:
+        return redirect(url_for('admin_review'))
+        
     if request.method == 'POST':
         password = request.form['password']
         if password == "1576":
             session['admin'] = True
             return redirect(url_for('admin_review'))
-        flash("密碼錯誤！")
+        flash("管理員密碼錯誤！")
     return render_template('admin_login.html')
 
 @app.route('/admin/review', methods=['GET', 'POST'])
+@admin_required
 def admin_review():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
     if request.method == 'POST':
         if 'user_id' in request.form:
             user_id = request.form['user_id']
@@ -162,11 +208,9 @@ def admin_review():
     return render_template('admin_review.html', pending_users=pending_users, pending_books=pending_books)
 
 @app.route('/admin/book_status')
+@admin_required
 def admin_book_status():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
-    
-    # 修正查詢語法
+    # 修正查詢，移除 created_at 排序
     books = supabase.table('publications')\
         .select('''
             *,
@@ -178,7 +222,7 @@ def admin_book_status():
         .execute().data
 
     for book in books:
-        # 獲取最新的未完成預約/借閱記錄
+        # 獲取最新的未完成預約/借閱記錄，移除 order by created_at
         reservation = supabase.table('reservations')\
             .select('''
                 *,
@@ -189,7 +233,6 @@ def admin_book_status():
             ''')\
             .eq('publication_id', book['id'])\
             .in_('status', ['待處理', '已準備', '已取書'])\
-            .order('created_at', desc=True)\
             .limit(1)\
             .execute().data
 
@@ -216,9 +259,8 @@ def admin_book_status():
     return render_template('admin_book_status.html', books=books)
 
 @app.route('/admin/reservations', methods=['GET', 'POST'])
+@admin_required
 def admin_reservations():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
     if request.method == 'POST':
         reservation_id = request.form['reservation_id']
         supabase.table('reservations').update({'status': '已準備'}).eq('id', reservation_id).execute()
@@ -228,6 +270,7 @@ def admin_reservations():
     return render_template('admin_reservations.html', reservations=pending_reservations)
 
 @app.route('/admin/qr/<bag_id>')
+@admin_required
 def admin_show_qr(bag_id):
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(url_for('borrow_checkin', bag_id=bag_id, _external=True))
@@ -239,9 +282,8 @@ def admin_show_qr(bag_id):
     return send_file(buf, mimetype='image/png')
 
 @app.route('/admin/qr_codes', methods=['GET', 'POST'])
+@admin_required
 def admin_qr_codes():
-    if 'admin' not in session:
-        return redirect(url_for('admin_login'))
     search_name = request.form.get('search_name', '') if request.method == 'POST' else ''
     query = supabase.table('users').select('id, phone, name, bag_id')
     if search_name:
@@ -282,21 +324,48 @@ def cancel_borrow(reservation_id):
 
 @app.route('/borrow_checkin/<bag_id>', methods=['GET', 'POST'])
 def borrow_checkin(bag_id):
+    # 設置 QR code 模式
+    session['qr_mode'] = True
+    session['bag_id'] = bag_id
+    session['qr_timestamp'] = time.time()
+    
+    # 檢查時間戳
+    if 'qr_timestamp' in session:
+        elapsed_time = time.time() - session['qr_timestamp']
+        if elapsed_time > 600:
+            session.pop('user_id', None)
+            flash('操作時間已過期，請重新掃描 QR Code！')
+            return redirect(url_for('login'))
+
+    # 檢查書袋是否有效
     user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
     if not user:
         flash("無效的書袋號碼！")
         return redirect(url_for('login'))
+    
     user_id = user[0]['id']
 
+    # 如果未登入，重定向到登入頁面
     if 'user_id' not in session:
         session['redirect_after_login'] = request.url
         return redirect(url_for('login'))
 
+    # 檢查是否是正確的用戶
     if session['user_id'] != user_id:
-        flash("這不是您的書袋！")
-        return redirect(url_for('index'))
+        # 清除 session 中的用戶資訊，但保留 QR 相關資訊
+        session.pop('user_id', None)
+        flash("您登入的帳號與書袋不符，請使用正確的帳號登入！")
+        return redirect(url_for('login'))
 
+    # 處理 POST 請求
     if request.method == 'POST':
+        # 再次檢查時間戳
+        if 'qr_timestamp' in session:
+            elapsed_time = time.time() - session['qr_timestamp']
+            if elapsed_time > 600:
+                flash('操作時間已過期，請重新掃描 QR Code！')
+                return redirect(url_for('login'))
+        
         action = request.form.get('action')
         book_ids = request.form.getlist('book_ids')
         if action == 'borrow':
@@ -314,9 +383,128 @@ def borrow_checkin(bag_id):
             flash("已確認還書，書籍已重新上架！")
         return redirect(url_for('index'))
 
-    pending_books = supabase.table('reservations').select('publication_id, publications(title, author)').eq('user_id', user_id).eq('status', '已準備').execute().data
-    borrowed_books = supabase.table('reservations').select('publication_id, publications(title, author)').eq('user_id', user_id).eq('status', '已取書').execute().data
-    return render_template('borrow_checkin.html', pending_books=pending_books, borrowed_books=borrowed_books, bag_id=bag_id)
+    # 獲取書籍資訊
+    pending_books = supabase.table('reservations')\
+        .select('publication_id, publications(title)')\
+        .eq('user_id', user_id)\
+        .eq('status', '已準備')\
+        .execute().data
+
+    borrowed_books = supabase.table('reservations')\
+        .select('publication_id, publications(title)')\
+        .eq('user_id', user_id)\
+        .eq('status', '已取書')\
+        .execute().data
+
+    return render_template('borrow_checkin.html', 
+                         pending_books=pending_books, 
+                         borrowed_books=borrowed_books,
+                         bag_id=bag_id)
+
+@app.route('/exit_qr_mode')
+def exit_qr_mode():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.before_request
+def check_qr_mode():
+    # 如果在 QR code 模式下訪問其他頁面，重定向回借還書頁面
+    if session.get('qr_mode') and request.endpoint not in ['borrow_checkin', 'login', 'logout', 'static', 'exit_qr_mode']:
+        return redirect(url_for('borrow_checkin', bag_id=session.get('bag_id')))
+
+@app.after_request
+def add_header(response):
+    if 'Cache-Control' not in response.headers:
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+@app.route('/qr/<bag_id>', methods=['GET'])
+def qr_system(bag_id):
+    # 重置所有 session，確保是全新的 QR code 操作
+    session.clear()
+    session['qr_mode'] = True
+    session['bag_id'] = bag_id
+    session['qr_timestamp'] = time.time()
+    return redirect(url_for('qr_login', bag_id=bag_id))
+
+@app.route('/qr/login/<bag_id>', methods=['GET', 'POST'])
+def qr_login(bag_id):
+    # 清除所有 session
+    session.clear()
+    
+    # 檢查書袋是否存在
+    bag_user = supabase.table('users').select('id, phone').eq('bag_id', bag_id).execute().data
+    if not bag_user:
+        return render_template('qr_error.html', message="無效的書袋！")
+    
+    if request.method == 'POST':
+        phone = request.form['phone']
+        password = request.form['password']
+        
+        # 檢查是否是書袋擁有者的手機號碼
+        if phone != bag_user[0]['phone']:
+            flash("這不是您的書袋！請使用正確的帳號登入。")
+            return render_template('qr_login.html', bag_id=bag_id)
+        
+        # 驗證密碼
+        user = supabase.table('users').select('id, password').eq('phone', phone).execute().data
+        try:
+            if not bcrypt.checkpw(password.encode('utf-8'), user[0]['password'].encode('utf-8')):
+                flash("密碼錯誤！")
+                return render_template('qr_login.html', bag_id=bag_id)
+        except:
+            flash("密碼驗證失敗！")
+            return render_template('qr_login.html', bag_id=bag_id)
+        
+        # 設置 QR 系統的 session
+        session['qr_mode'] = True
+        session['qr_user_id'] = user[0]['id']
+        session['qr_timestamp'] = time.time()
+        session['bag_id'] = bag_id
+        
+        return redirect(url_for('qr_borrow_return', bag_id=bag_id))
+    
+    return render_template('qr_login.html', bag_id=bag_id)
+
+@app.route('/qr/borrow-return/<bag_id>', methods=['GET', 'POST'])
+def qr_borrow_return(bag_id):
+    # 嚴格檢查 QR 模式的 session
+    if not all(key in session for key in ['qr_mode', 'qr_user_id', 'qr_timestamp', 'bag_id']):
+        return redirect(url_for('qr_login', bag_id=bag_id))
+    
+    # 檢查是否是正確的書袋
+    if session['bag_id'] != bag_id:
+        session.clear()
+        return redirect(url_for('qr_login', bag_id=bag_id))
+    
+    # 檢查時間是否過期
+    if time.time() - session['qr_timestamp'] > 600:
+        session.clear()
+        flash('操作時間已過期，請重新掃描 QR Code！')
+        return redirect(url_for('qr_login', bag_id=bag_id))
+
+    # 獲取書籍資訊
+    pending_books = supabase.table('reservations')\
+        .select('publication_id, publications(title)')\
+        .eq('user_id', session['qr_user_id'])\
+        .eq('status', '已準備')\
+        .execute().data
+
+    borrowed_books = supabase.table('reservations')\
+        .select('publication_id, publications(title)')\
+        .eq('user_id', session['qr_user_id'])\
+        .eq('status', '已取書')\
+        .execute().data
+
+    return render_template('qr_borrow_return.html', 
+                         pending_books=pending_books, 
+                         borrowed_books=borrowed_books,
+                         bag_id=bag_id)
+
+@app.route('/qr/logout/<bag_id>')
+def qr_logout(bag_id):
+    session.clear()
+    return redirect(url_for('qr_login', bag_id=bag_id))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)

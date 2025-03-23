@@ -1,45 +1,69 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>管理員 - QR Codes</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <header>
-        <h1>所有用戶 QR Codes</h1>
-        <nav>
-            <a href="{{ url_for('admin_review') }}">返回審核</a>
-            <a href="{{ url_for('admin_book_status') }}">書籍狀態</a>
-            <a href="{{ url_for('logout') }}">登出</a>
-        </nav>
-    </header>
-    <main>
-        <form method="POST" class="card">
-            <input type="text" name="search_name" placeholder="搜尋用戶姓名" value="{{ search_name }}">
-            <input type="submit" value="搜尋">
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h2 class="card-title">用戶 QR Code</h2>
+        
+        <form method="POST" class="mb-4">
+            <div class="input-group">
+                <input type="text" class="form-control" name="search_name" 
+                       placeholder="搜尋用戶名稱..." value="{{ search_name }}">
+                <div class="input-group-append">
+                    <button type="submit" class="btn btn-primary">搜尋</button>
+                </div>
+            </div>
         </form>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>姓名</th>
-                    <th>電話</th>
-                    <th>書袋ID</th>
-                    <th>QR Code</th>
-                    <th>借書網址</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                <tr>
-                    <td>{{ user.name }}</td>
-                    <td>{{ user.phone }}</td>
-                    <td>{{ user.bag_id }}</td>
-                    <td><img src="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" width="100"></td>
-                    <td><a href="{{ user.borrow_url }}" target="_blank">{{ user.borrow_url }}</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </main>
-</body>
-</html>
+
+        <div class="table-responsive">
+            <table class="table table-responsive-card">
+                <thead>
+                    <tr>
+                        <th>姓名</th>
+                        <th>電話</th>
+                        <th>書袋ID</th>
+                        <th>QR Code</th>
+                        <th>借書連結</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td data-label="姓名">{{ user.name }}</td>
+                        <td data-label="電話">{{ user.phone }}</td>
+                        <td data-label="書袋ID">{{ user.bag_id }}</td>
+                        <td data-label="QR Code">
+                            <img src="{{ url_for('admin_show_qr', bag_id=user.bag_id) }}" 
+                                 class="img-fluid" style="max-width: 150px;">
+                        </td>
+                        <td data-label="借書連結">
+                            {% set borrow_url = url_for('borrow_checkin', bag_id=user.bag_id, _external=True) %}
+                            <a href="{{ borrow_url }}" target="_blank" class="btn btn-sm btn-info">開啟連結</a>
+                            <button class="btn btn-sm btn-secondary copy-btn" 
+                                    data-clipboard-text="{{ borrow_url }}">複製連結</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 添加 clipboard.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+<script>
+    // 初始化 clipboard.js
+    new ClipboardJS('.copy-btn');
+    
+    // 添加複製成功提示
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.textContent = '已複製！';
+            setTimeout(() => {
+                this.textContent = '複製連結';
+            }, 2000);
+        });
+    });
+</script>
+{% endblock %}

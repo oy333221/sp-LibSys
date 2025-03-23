@@ -1,47 +1,140 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>書袋操作 - {{ bag_id }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <header>
-        <h1>書袋操作 - {{ bag_id }}</h1>
-        <nav>
-            <a href="{{ url_for('logout') }}">登出</a>
-        </nav>
-    </header>
-    <main>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash">{{ messages[0] }}</div>
-            {% endif %}
-        {% endwith %}
-        <form method="POST" class="card">
-            <h3>待取書籍</h3>
-            {% if pending_books %}
+{% extends "base.html" %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-light bg-warning">
+    <div class="container">
+        <span class="navbar-brand">
+            <i class="fas fa-qrcode mr-2"></i>QR Code 借還書系統
+        </span>
+        {% if session.get('user_id') %}
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('logout') }}">登出</a>
+            </li>
+        </ul>
+        {% endif %}
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="card-title mb-0">
+                <i class="fas fa-book-reader mr-2"></i>現場借還書操作
+            </h2>
+            <div id="timer" class="text-danger">
+                <i class="fas fa-clock mr-1"></i>
+                剩餘時間: <span id="countdown">10:00</span>
+            </div>
+        </div>
+        
+        <div class="alert alert-warning mb-4">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            請注意：此頁面將在 10 分鐘後過期，請在時限內完成操作
+        </div>
+
+        {% if pending_books %}
+        <div class="mb-4">
+            <h3 class="text-primary">
+                <i class="fas fa-inbox mr-2"></i>待取書籍
+            </h3>
+            <form method="POST" id="borrowForm">
                 {% for book in pending_books %}
-                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }}</label><br>
+                <div class="custom-control custom-checkbox mb-2">
+                    <input type="checkbox" class="custom-control-input" 
+                           id="book_{{ book.publication_id }}" 
+                           name="book_ids" 
+                           value="{{ book.publication_id }}">
+                    <label class="custom-control-label" for="book_{{ book.publication_id }}">
+                        {{ book.publications.title }}
+                    </label>
+                </div>
                 {% endfor %}
-                <input type="hidden" name="action" value="borrow">
-                <input type="submit" value="確認取書">
-            {% else %}
-                <p>目前無待取書籍。</p>
-            {% endif %}
-        </form>
-        <form method="POST" class="card">
-            <h3>待還書籍</h3>
-            {% if borrowed_books %}
+                <button type="submit" name="action" value="borrow" 
+                        class="btn btn-primary mt-3">
+                    <i class="fas fa-hand-holding mr-2"></i>確認取書
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if borrowed_books %}
+        <div>
+            <h3 class="text-success">
+                <i class="fas fa-undo-alt mr-2"></i>待還書籍
+            </h3>
+            <form method="POST" id="returnForm">
                 {% for book in borrowed_books %}
-                    <label><input type="checkbox" name="book_ids" value="{{ book.publication_id }}"> {{ book.publications.title }}</label><br>
+                <div class="custom-control custom-checkbox mb-2">
+                    <input type="checkbox" class="custom-control-input" 
+                           id="return_{{ book.publication_id }}" 
+                           name="book_ids" 
+                           value="{{ book.publication_id }}">
+                    <label class="custom-control-label" for="return_{{ book.publication_id }}">
+                        {{ book.publications.title }}
+                    </label>
+                </div>
                 {% endfor %}
-                <input type="hidden" name="action" value="return">
-                <input type="submit" value="確認還書">
-            {% else %}
-                <p>目前無待還書籍。</p>
-            {% endif %}
-        </form>
-        <a href="{{ url_for('index') }}" class="btn">返回首頁</a>
-    </main>
-</body>
-</html>
+                <button type="submit" name="action" value="return" 
+                        class="btn btn-success mt-3">
+                    <i class="fas fa-check mr-2"></i>確認還書
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if not pending_books and not borrowed_books %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle mr-2"></i>
+            目前沒有需要處理的書籍。
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 添加 Font Awesome -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+
+<!-- 計時器和頁面過期處理的 JavaScript -->
+<script>
+let timeLeft = 600; // 10 minutes in seconds
+const countdownElement = document.getElementById('countdown');
+
+function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    if (timeLeft <= 0) {
+        // 儲存表單數據
+        const formData = new FormData(document.querySelector('form'));
+        
+        // 顯示過期提示
+        alert('頁面已過期，請重新掃描 QR Code！');
+        
+        // 重新載入頁面（會觸發重新認證）
+        window.location.reload();
+    } else {
+        timeLeft--;
+    }
+}
+
+// 每秒更新計時器
+setInterval(updateTimer, 1000);
+
+// 監聽頁面可見性變化
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        // 當頁面重新變為可見時，檢查是否需要重新認證
+        fetch(window.location.href, { method: 'HEAD' })
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.reload();
+                }
+            });
+    }
+});
+</script>
+{% endblock %}
