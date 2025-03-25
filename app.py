@@ -41,7 +41,7 @@ def index():
         return redirect(url_for('login'))
     
     books = supabase.table('publications')\
-        .select('id, title, description, product_link, status')\
+        .select('id, title, description, product_link, status, isbn')\
         .eq('status', '可借閱')\
         .execute().data
     
@@ -113,12 +113,16 @@ def process_book_info(isbn, owner_id):
             cover_url = cover_elem['src']
             if not cover_url.startswith('http'):
                 cover_url = "https:" + cover_url
+            print(f"下載書封: {cover_url}")
                 
             img_response = requests.get(cover_url, headers=headers, timeout=10)
             if img_response.status_code == 200:
                 cover_path = f"/covers/{isbn}.jpg"
-                with open(os.path.join('static/covers', f"{isbn}.jpg"), 'wb') as f:
+                local_cover_path = os.path.join('static', 'covers', f"{isbn}.jpg")
+                print(f"儲存書封到: {local_cover_path}")
+                with open(local_cover_path, 'wb') as f:
                     f.write(img_response.content)
+                print("書封儲存成功")
         
         # 5. 更新資料庫
         update_data = {
@@ -263,11 +267,15 @@ def admin_review():
             action = request.form['action']
             supabase.table('pending_books').update({'status': '已通過' if action == 'approved' else '已拒絕'}).eq('id', book_id).execute()
             if action == 'approved':
-                book = supabase.table('pending_books').select('isbn, title, owner_id').eq('id', book_id).execute().data[0]
+                # 獲取完整的書籍資訊
+                book = supabase.table('pending_books').select('*').eq('id', book_id).execute().data[0]
                 supabase.table('publications').insert({
                     'isbn': book['isbn'],
                     'title': book['title'],
-                    'author': '未知作者',
+                    'author': book['author'],
+                    'description': book['description'],
+                    'product_link': book['product_link'],
+                    'cover_url': book['cover_url'],
                     'owner_id': book['owner_id'],
                     'status': '可借閱'
                 }).execute()
