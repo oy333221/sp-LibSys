@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 視圖切換按鈕 -->
+    <div class="d-flex justify-content-end mb-3">
+        <div class="btn-group">
+            <button class="btn btn-outline-primary active" id="coverView">
+                <i class="fas fa-th-large"></i>
+            </button>
+            <button class="btn btn-outline-primary" id="listView">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 封面視圖 -->
+    <div id="coverViewContainer">
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
+            {% for publication in publications %}
+            <div class="col">
+                <div class="card h-100">
+                    <div class="position-relative">
+                        <!-- 使用現有的 cover_image 欄位 -->
+                        {% if publication.cover_image %}
+                        <img src="{{ url_for('static', filename=publication.cover_image) }}" 
+                             class="card-img-top" alt="{{ publication.name }}"
+                             style="height: 300px; object-fit: cover;"
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}';">
+                        {% else %}
+                        <img src="{{ url_for('static', filename='images/default-book.png') }}" 
+                             class="card-img-top" alt="預設圖片"
+                             style="height: 300px; object-fit: cover;">
+                        {% endif %}
+                        
+                        {% if publication.status == '可借閱' %}
+                        <span class="badge bg-success position-absolute top-0 end-0 m-2">可借閱</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title text-truncate">{{ publication.name }}</h5>
+                        <button class="btn btn-sm btn-primary" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#publicationModal{{ publication.id }}">
+                            詳細資訊
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 使用原有的 Modal -->
+            {% include 'components/_publication_modal.html' %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 原有的列表視圖 -->
+    <div id="listViewContainer" class="d-none">
+        <div class="table-responsive">
+            <!-- 保持原有的表格內容不變 -->
+            {{ publications_table | safe }}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const coverViewBtn = document.getElementById('coverView');
+    const listViewBtn = document.getElementById('listView');
+    const coverViewContainer = document.getElementById('coverViewContainer');
+    const listViewContainer = document.getElementById('listViewContainer');
+
+    // 從 localStorage 讀取上次的視圖設定
+    const lastView = localStorage.getItem('viewMode') || 'cover';
+    
+    if (lastView === 'list') {
+        showListView();
+    }
+
+    coverViewBtn.addEventListener('click', showCoverView);
+    listViewBtn.addEventListener('click', showListView);
+
+    function showCoverView() {
+        coverViewContainer.classList.remove('d-none');
+        listViewContainer.classList.add('d-none');
+        coverViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
+        localStorage.setItem('viewMode', 'cover');
+    }
+
+    function showListView() {
+        listViewContainer.classList.remove('d-none');
+        coverViewContainer.classList.add('d-none');
+        listViewBtn.classList.add('active');
+        coverViewBtn.classList.remove('active');
+        localStorage.setItem('viewMode', 'list');
+    }
+});
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-5px);
+}
+</style>
+{% endblock %} 

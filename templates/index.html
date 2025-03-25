@@ -1,87 +1,219 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- 可借閱書籍 -->
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="card-title">可借閱書籍</h2>
-                <div class="table-responsive">
-                    <table class="table table-responsive-card">
-                        <thead>
-                            <tr>
-                                <th>書名</th>
-                                <th>描述</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for book in books %}
-                            <tr>
-                                <td data-label="書名">
-                                    {{ book.title }}
-                                    {% if book.product_link %}
-                                    <br>
-                                    <a href="{{ book.product_link }}" target="_blank" class="small">查看詳情</a>
-                                    {% endif %}
-                                </td>
-                                <td data-label="描述">{{ book.description[:100] }}...</td>
-                                <td data-label="操作">
-                                    <form method="POST" action="{{ url_for('borrow', book_id=book.id) }}">
-                                        <button type="submit" class="btn btn-primary">借閱</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+<div class="container">
+    <!-- 可借閱書籍區塊 -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3>可借閱書籍</h3>
+            <div class="d-flex gap-2">
+                <!-- 新增書籍按鈕 -->
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addBooksModal">
+                    <i class="fas fa-plus me-1"></i> 新增書籍
+                </button>
+                <!-- 視圖切換按鈕 -->
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" id="listView">
+                        <i class="fas fa-list"></i> 列表
+                    </button>
+                    <button class="btn btn-outline-secondary" id="coverView">
+                        <i class="fas fa-th-large"></i> 封面
+                    </button>
                 </div>
             </div>
         </div>
+
+        <!-- 封面視圖 -->
+        <div id="coverViewContainer" class="d-none">
+            {% if books %}
+            <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
+                {% for book in books %}
+                <div class="col">
+                    <div class="card h-100">
+                        {% if book.cover_image %}
+                        <img src="{{ url_for('static', filename=book.cover_image) }}" 
+                             class="card-img-top" alt="{{ book.title }}"
+                             style="height: 300px; object-fit: cover;"
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}';">
+                        {% else %}
+                        <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 300px;">
+                            <i class="fas fa-book fa-4x text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ book.title }}</h5>
+                            <p class="card-text">{{ book.description }}</p>
+                            {% if book.status == '可借閱' %}
+                            <form action="{{ url_for('borrow', book_id=book.id) }}" method="POST">
+                                <button type="submit" class="btn btn-primary">借閱</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center">
+                <h4>目前沒有可借閱的書籍</h4>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 列表視圖 -->
+        <div id="listViewContainer">
+            {% if books %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>書名</th>
+                            <th>描述</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for book in books %}
+                        <tr>
+                            <td>{{ book.title }}</td>
+                            <td>{{ book.description }}</td>
+                            <td>
+                                {% if book.status == '可借閱' %}
+                                <form action="{{ url_for('borrow', book_id=book.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-primary btn-sm">借閱</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
     </div>
 
-    <!-- 我的預約 -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="card-title">我的預約</h2>
-                <div class="table-responsive">
-                    <table class="table table-responsive-card">
-                        <thead>
-                            <tr>
-                                <th>書名</th>
-                                <th>狀態</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for reservation in reservations %}
-                            <tr>
-                                <td data-label="書名">{{ reservation.publications.title }}</td>
-                                <td data-label="狀態">
-                                    <span class="badge badge-{{ 
-                                        'warning' if reservation.status in ['待處理', '已準備']
-                                        else 'info' if reservation.status == '已取書'
-                                        else 'secondary' 
-                                    }}">
-                                        {{ reservation.status }}
-                                    </span>
-                                </td>
-                                <td data-label="操作">
-                                    {% if reservation.status == '待處理' %}
-                                    <form method="POST" action="{{ url_for('cancel_borrow', reservation_id=reservation.id) }}">
-                                        <button type="submit" class="btn btn-danger btn-sm">取消</button>
-                                    </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <!-- 預約書籍區塊 -->
+    <div class="mt-4">
+        <h3>我的預約</h3>
+        {% if reservations %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>書名</th>
+                        <th>狀態</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reservation in reservations %}
+                    <tr>
+                        <td>{{ reservation.publications.title }}</td>
+                        <td>{{ reservation.status }}</td>
+                        <td>
+                            {% if reservation.status == '待處理' %}
+                            <form action="{{ url_for('cancel_borrow', reservation_id=reservation.id) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-danger btn-sm">取消預約</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center">
+            <p class="text-muted">目前沒有預約的書籍</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 新增書籍 Modal -->
+    <div class="modal fade" id="addBooksModal" tabindex="-1" aria-labelledby="addBooksModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addBooksModalLabel">新增書籍</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <form action="{{ url_for('add_books') }}" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="isbns" class="form-label">ISBN（每行一個）</label>
+                            <textarea class="form-control" id="isbns" name="isbns" rows="5" 
+                                    placeholder="請輸入 ISBN，每行一個&#10;例如：&#10;9789861371955&#10;9789861371956"
+                                    required></textarea>
+                            <div class="form-text">請確保每個 ISBN 都是正確的格式</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">提交</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const listViewBtn = document.getElementById('listView');
+    const coverViewBtn = document.getElementById('coverView');
+    const listViewContainer = document.getElementById('listViewContainer');
+    const coverViewContainer = document.getElementById('coverViewContainer');
+
+    // 預設使用列表視圖
+    listViewBtn.classList.add('active');
+
+    listViewBtn.addEventListener('click', function() {
+        listViewContainer.classList.remove('d-none');
+        coverViewContainer.classList.add('d-none');
+        listViewBtn.classList.add('active');
+        coverViewBtn.classList.remove('active');
+    });
+
+    coverViewBtn.addEventListener('click', function() {
+        coverViewContainer.classList.remove('d-none');
+        listViewContainer.classList.add('d-none');
+        coverViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
+    });
+
+    // 測試 Modal 是否正確載入
+    const addBooksModal = document.getElementById('addBooksModal');
+    if (addBooksModal) {
+        console.log('Modal element found');
+        const modal = new bootstrap.Modal(addBooksModal);
+        const addButton = document.querySelector('[data-bs-target="#addBooksModal"]');
+        if (addButton) {
+            console.log('Add button found');
+            addButton.addEventListener('click', function() {
+                console.log('Button clicked');
+                modal.show();
+            });
+        }
+    }
+});
+</script>
+
+<style>
+.book-card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.book-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 768px) {
+    .card-img-top {
+        height: 200px !important;
+    }
+}
+</style>
 {% endblock %}

@@ -1,65 +1,145 @@
 from supabase import create_client, Client
 import requests
+from bs4 import BeautifulSoup
 import time
+import os
+import re
 
-supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
-supabase: Client = create_client(supabase_url, supabase_key)
+# Supabase 設定
+supabase: Client = create_client(
+    "https://uidcuqimzkzvoscqhyax.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
+)
 
-def crawl_book_info(isbn):
-    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200 and response.json()['totalItems'] > 0:
-            book = response.json()['items'][0]['volumeInfo']
-            return {
-                'title': book.get('title', '未知書名'),
-                'author': ', '.join(book.get('authors', ['未知作者'])),
-                'description': book.get('description', '無描述'),
-                'product_link': f"https://books.google.com/books?isbn={isbn}"
-            }
-    except Exception as e:
-        print(f"Error crawling ISBN {isbn}: {str(e)}")
-    return None
+# 設定儲存書封的資料夾
+STATIC_DIR = "static/covers"
+os.makedirs(STATIC_DIR, exist_ok=True)
 
-def update_pending_book(isbn):
-    info = crawl_book_info(isbn)
-    if info:
-        supabase.table('pending_books').update({
-            'title': info['title'],
-            'author': info['author'],
-            'description': info.get('description', '無描述'),
-            'product_link': info['product_link']
-        }).eq('isbn', isbn).execute()
-        return True
-    return False
+def is_valid_isbn(isbn):
+    """驗證 ISBN 格式"""
+    isbn = re.sub(r'[^0-9X]', '', isbn)
+    if len(isbn) not in [10, 13]:
+        print(f"無效的 ISBN 長度: {len(isbn)}")
+        return False
+    if len(isbn) == 13:
+        if not isbn.startswith('978') and not isbn.startswith('979'):
+            print(f"ISBN-13 必須以 978 或 979 開頭: {isbn}")
+            return False
+    return True
 
-def monitor_pending_books():
-    """持續監控 pending_books 表格，對新的 ISBN 進行爬蟲"""
-    print("開始監控 pending_books...")
-    last_check = 0
+def process_book(isbn):
+    print(f"開始從博客來爬取 ISBN: {isbn}")  # 除錯訊息
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     
+    try:
+        # 1. 搜尋頁面
+        search_url = f"https://search.books.com.tw/search/query/key/{isbn}/cat/all"
+        print(f"訪問搜尋頁面: {search_url}")  # 除錯訊息
+        search_response = requests.get(search_url, headers=headers, timeout=10)
+        if search_response.status_code != 200:
+            print(f"搜尋頁面返回狀態碼: {search_response.status_code}")  # 除錯訊息
+            return None
+            
+        search_soup = BeautifulSoup(search_response.text, 'html.parser')
+        product_link = search_soup.select_one('a[href*="/redirect/move/"]')
+        if not product_link:
+            print("找不到商品連結")  # 除錯訊息
+            return None
+            
+        # 2. 取得商品頁面
+        item_id = product_link['href'].split('item/')[1].split('/')[0]
+        product_url = f"https://www.books.com.tw/products/{item_id}"
+        print(f"訪問商品頁面: {product_url}")  # 除錯訊息
+        
+        response = requests.get(product_url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            print(f"商品頁面返回狀態碼: {response.status_code}")  # 除錯訊息
+            return None
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 3. 提取資訊
+        title = soup.select_one('h1').text.strip()
+        print(f"找到書名: {title}")  # 除錯訊息
+        
+        author_elem = soup.select_one('.type02_p003 li')
+        author = '未知作者'
+        if author_elem:
+            author_text = author_elem.text.strip()
+            match = re.search(r'作者：\s*([^\s]+)', author_text)
+            if match:
+                author = match.group(1)
+        print(f"找到作者: {author}")  # 除錯訊息
+                
+        description = soup.select_one('.content')
+        description = description.text.strip() if description else '無描述'
+        print(f"找到描述，長度: {len(description)}")  # 除錯訊息
+        
+        # 4. 處理書封
+        cover_path = None
+        cover_elem = soup.select_one('img.cover')
+        if cover_elem and 'src' in cover_elem.attrs:
+            cover_url = cover_elem['src']
+            if not cover_url.startswith('http'):
+                cover_url = "https:" + cover_url
+            print(f"下載書封: {cover_url}")  # 除錯訊息
+                
+            img_response = requests.get(cover_url, headers=headers, timeout=10)
+            if img_response.status_code == 200:
+                cover_path = f"/covers/{isbn}.jpg"
+                with open(os.path.join(STATIC_DIR, f"{isbn}.jpg"), 'wb') as f:
+                    f.write(img_response.content)
+                print("書封下載成功")  # 除錯訊息
+        
+        # 5. 更新資料庫
+        print("更新資料庫")  # 除錯訊息
+        supabase.table('pending_books').update({
+            'title': title,
+            'author': author,
+            'description': description,
+            'product_link': product_url,
+            'cover_url': cover_path,
+            'error_message': None
+        }).eq('isbn', isbn).execute()
+        
+        print(f"成功處理 ISBN {isbn} 的資訊")  # 除錯訊息
+        return True
+        
+    except Exception as e:
+        print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")  # 除錯訊息
+        return None
+
+def main():
+    print("啟動博客來爬蟲程式")  # 除錯訊息
     while True:
         try:
-            # 獲取最近新增的待處理書籍
-            new_books = supabase.table('pending_books')\
-                .select('isbn, title')\
-                .eq('status', '待審核')\
-                .is_('title', 'null')\
-                .execute()
-
-            for book in new_books.data:
-                print(f"處理 ISBN: {book['isbn']}")
-                if update_pending_book(book['isbn']):
-                    print(f"成功更新 ISBN {book['isbn']} 的資訊")
+            # 獲取待處理的書籍
+            result = supabase.table('pending_books').select('*').eq('status', '待審核').execute()
+            
+            if not result.data:
+                print("沒有待處理的書籍")
+                time.sleep(10)
+                continue
+                
+            for book in result.data:
+                isbn = book['isbn']
+                print(f"\n開始處理 ISBN: {isbn}")
+                
+                if process_book(isbn):
+                    print(f"成功處理 ISBN {isbn}")
                 else:
-                    print(f"無法找到 ISBN {book['isbn']} 的資訊")
-            
-            time.sleep(10)  # 每10秒檢查一次
-            
+                    print(f"更新錯誤訊息: ISBN {isbn}")
+                    supabase.table('pending_books').update({
+                        'error_message': '無法從博客來找到此書籍'
+                    }).eq('isbn', isbn).execute()
+                    print(f"無法處理 ISBN {isbn}")
+                    
         except Exception as e:
-            print(f"監控過程發生錯誤: {str(e)}")
-            time.sleep(30)  # 發生錯誤時等待30秒後繼續
+            print(f"執行時發生錯誤: {str(e)}")
+            
+        time.sleep(10)
 
 if __name__ == "__main__":
-    monitor_pending_books()
+    main()

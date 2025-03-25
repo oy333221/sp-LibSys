@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 視圖切換按鈕 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>可借閱書籍</h2>
+        <div class="btn-group">
+            <button class="btn btn-outline-primary active" id="coverView" title="封面視圖">
+                <i class="fas fa-th-large"></i>
+            </button>
+            <button class="btn btn-outline-primary" id="listView" title="列表視圖">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 封面視圖 (預設) -->
+    <div id="coverViewContainer">
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
+            {% for book in books %}
+            <div class="col">
+                <div class="card h-100 book-card" style="cursor: pointer;" 
+                     data-bs-toggle="modal" data-bs-target="#bookModal{{ book.id }}">
+                    {% if book.cover_url %}
+                    <img src="{{ book.cover_url }}" class="card-img-top book-cover" alt="{{ book.title }}">
+                    {% else %}
+                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" 
+                         style="height: 300px;">
+                        <i class="fas fa-book fa-4x text-muted"></i>
+                    </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title text-truncate">{{ book.title }}</h5>
+                        {% if book.status == '可借閱' %}
+                        <span class="badge bg-success position-absolute top-0 end-0 m-2">可借閱</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 書籍詳情 Modal -->
+            <div class="modal fade" id="bookModal{{ book.id }}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ book.title }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    {% if book.cover_url %}
+                                    <img src="{{ book.cover_url }}" class="img-fluid rounded" alt="{{ book.title }}">
+                                    {% else %}
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                                         style="height: 300px;">
+                                        <i class="fas fa-book fa-4x text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-8">
+                                    <h6>作者：{{ book.author }}</h6>
+                                    <p class="text-muted">{{ book.description }}</p>
+                                    <div class="mt-3">
+                                        {% if book.status == '可借閱' %}
+                                        <a href="{{ url_for('borrow_book', book_id=book.id) }}" 
+                                           class="btn btn-primary">
+                                            <i class="fas fa-book-reader me-2"></i>借閱
+                                        </a>
+                                        {% endif %}
+                                        {% if book.product_link %}
+                                        <a href="{{ book.product_link }}" 
+                                           class="btn btn-outline-secondary" 
+                                           target="_blank">
+                                            <i class="fas fa-external-link-alt me-2"></i>更多資訊
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 列表視圖 (初始隱藏) -->
+    <div id="listViewContainer" class="d-none">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>書名</th>
+                        <th>作者</th>
+                        <th>狀態</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in books %}
+                    <tr>
+                        <td>{{ book.title }}</td>
+                        <td>{{ book.author }}</td>
+                        <td>
+                            {% if book.status == '可借閱' %}
+                            <span class="badge bg-success">可借閱</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ book.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#bookModal{{ book.id }}">
+                                詳情
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.book-card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.book-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.book-cover {
+    height: 300px;
+    object-fit: cover;
+}
+
+@media (max-width: 768px) {
+    .book-cover {
+        height: 200px;
+    }
+}
+
+.btn-group .btn.active {
+    background-color: #0d6efd;
+    color: white;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const coverViewBtn = document.getElementById('coverView');
+    const listViewBtn = document.getElementById('listView');
+    const coverViewContainer = document.getElementById('coverViewContainer');
+    const listViewContainer = document.getElementById('listViewContainer');
+
+    // 從 localStorage 讀取上次的視圖設定
+    const lastView = localStorage.getItem('bookViewMode') || 'cover';
+    
+    // 設置初始視圖
+    if (lastView === 'list') {
+        showListView();
+    } else {
+        showCoverView();
+    }
+
+    coverViewBtn.addEventListener('click', showCoverView);
+    listViewBtn.addEventListener('click', showListView);
+
+    function showCoverView() {
+        coverViewContainer.classList.remove('d-none');
+        listViewContainer.classList.add('d-none');
+        coverViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
+        localStorage.setItem('bookViewMode', 'cover');
+    }
+
+    function showListView() {
+        listViewContainer.classList.remove('d-none');
+        coverViewContainer.classList.add('d-none');
+        listViewBtn.classList.add('active');
+        coverViewBtn.classList.remove('active');
+        localStorage.setItem('bookViewMode', 'list');
+    }
+});
+</script>
+{% endblock %} 

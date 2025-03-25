@@ -8,6 +8,12 @@ from functools import wraps
 import requests
 from datetime import datetime, timedelta
 import time
+import logging
+from bs4 import BeautifulSoup
+import re
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.urandom(24)
@@ -55,37 +61,89 @@ def index():
 def process_book_info(isbn, owner_id):
     """立即處理書籍資訊"""
     try:
-        # 先新增基本資訊到 pending_books
-        pending_book = supabase.table('pending_books').insert({
-            'isbn': isbn,
-            'owner_id': owner_id,
-            'status': '待審核',
-            'title': '處理中...'
-        }).execute().data[0]
-
-        # 立即爬取資訊
-        url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
-        response = requests.get(url)
-        if response.status_code == 200 and response.json()['totalItems'] > 0:
-            book = response.json()['items'][0]['volumeInfo']
-            # 更新書籍資訊
-            supabase.table('pending_books').update({
-                'title': book.get('title', '未知書名'),
-                'author': ', '.join(book.get('authors', ['未知作者'])),
-                'description': book.get('description', '無描述'),
-                'product_link': f"https://books.google.com/books?isbn={isbn}"
-            }).eq('id', pending_book['id']).execute()
-            return True
-        else:
-            # 如果找不到資訊，設置預設值
-            supabase.table('pending_books').update({
-                'title': f'未找到資訊的書籍 (ISBN: {isbn})',
-                'author': '未知作者',
-                'description': '無法從 Google Books 找到此書資訊'
-            }).eq('id', pending_book['id']).execute()
+        print(f"開始處理 ISBN {isbn} 的資訊")
+        
+        # 使用博客來爬蟲
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        # 1. 搜尋頁面
+        search_url = f"https://search.books.com.tw/search/query/key/{isbn}/cat/all"
+        search_response = requests.get(search_url, headers=headers, timeout=10)
+        if search_response.status_code != 200:
+            print(f"搜尋頁面返回狀態碼: {search_response.status_code}")
             return False
+            
+        search_soup = BeautifulSoup(search_response.text, 'html.parser')
+        product_link = search_soup.select_one('a[href*="/redirect/move/"]')
+        if not product_link:
+            print("找不到商品連結")
+            return False
+            
+        # 2. 取得商品頁面
+        item_id = product_link['href'].split('item/')[1].split('/')[0]
+        product_url = f"https://www.books.com.tw/products/{item_id}"
+        
+        response = requests.get(product_url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            print(f"商品頁面返回狀態碼: {response.status_code}")
+            return False
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 3. 提取資訊
+        title = soup.select_one('h1').text.strip()
+        
+        author_elem = soup.select_one('.type02_p003 li')
+        author = '未知作者'
+        if author_elem:
+            author_text = author_elem.text.strip()
+            match = re.search(r'作者：\s*([^\s]+)', author_text)
+            if match:
+                author = match.group(1)
+                
+        description = soup.select_one('.content')
+        description = description.text.strip() if description else '無描述'
+        
+        # 4. 處理書封
+        cover_path = None
+        cover_elem = soup.select_one('img.cover')
+        if cover_elem and 'src' in cover_elem.attrs:
+            cover_url = cover_elem['src']
+            if not cover_url.startswith('http'):
+                cover_url = "https:" + cover_url
+                
+            img_response = requests.get(cover_url, headers=headers, timeout=10)
+            if img_response.status_code == 200:
+                cover_path = f"/covers/{isbn}.jpg"
+                with open(os.path.join('static/covers', f"{isbn}.jpg"), 'wb') as f:
+                    f.write(img_response.content)
+        
+        # 5. 更新資料庫
+        update_data = {
+            'title': title,
+            'author': author,
+            'description': description,
+            'product_link': product_url,
+            'cover_url': cover_path,
+            'error_message': None
+        }
+        
+        result = supabase.table('pending_books')\
+            .update(update_data)\
+            .eq('isbn', isbn)\
+            .eq('owner_id', owner_id)\
+            .execute()
+        
+        print(f"更新結果: {result.data}")
+        return True
+        
     except Exception as e:
         print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")
+        supabase.table('pending_books').update({
+            'error_message': '無法從博客來找到此書籍'
+        }).eq('isbn', isbn).eq('owner_id', owner_id).execute()
         return False
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -113,18 +171,30 @@ def register():
                 'max_borrow': 2
             }).execute().data[0]
 
-            # 處理書籍 ISBN
+            # 處理書籍 ISBN（使用相同的邏輯）
             isbns = request.form.get('isbns', '').strip().split('\n')
+            added_count = 0
+            
             for isbn in isbns:
                 isbn = isbn.strip()
                 if isbn:
-                    process_book_info(isbn, new_user['id'])
+                    try:
+                        supabase.table('pending_books').insert({
+                            'isbn': isbn,
+                            'owner_id': new_user['id'],
+                            'status': '待審核'
+                        }).execute()
+                        added_count += 1
+                        process_book_info(isbn, new_user['id'])
+                    except Exception as e:
+                        print(f"新增書籍失敗 ISBN {isbn}: {str(e)}")
+                        continue
 
             flash("註冊成功，請等待審核！")
             return redirect(url_for('login'))
             
         except Exception as e:
-            print(f"Registration error: {str(e)}")  # 調試用
+            print(f"Registration error: {str(e)}")
             flash("註冊過程發生錯誤，請稍後再試！")
             return redirect(url_for('register'))
 
@@ -505,6 +575,120 @@ def qr_borrow_return(bag_id):
 def qr_logout(bag_id):
     session.clear()
     return redirect(url_for('qr_login', bag_id=bag_id))
+
+@app.route('/admin/pending-books/approve/<isbn>', methods=['POST'])
+@admin_required
+def approve_book(isbn):
+    try:
+        # 獲取待審核書籍資訊
+        pending_book = supabase.table('pending_books').select('*').eq('isbn', isbn).single().execute()
+        
+        if not pending_book.data:
+            flash('找不到該書籍')
+            return redirect(url_for('admin_pending_books'))
+        
+        # 將書籍資訊複製到 publications
+        book_data = {
+            'isbn': isbn,
+            'title': pending_book.data['title'],
+            'author': pending_book.data['author'],
+            'description': pending_book.data['description'],
+            'cover_url': pending_book.data['cover_url'],
+            'product_link': pending_book.data['product_link'],
+            'status': '可借閱'
+        }
+        
+        # 新增到 publications
+        supabase.table('publications').insert(book_data).execute()
+        
+        # 更新 pending_books 狀態
+        supabase.table('pending_books').update({
+            'status': '已審核',
+            'processed_at': 'NOW()'
+        }).eq('isbn', isbn).execute()
+        
+        flash('書籍已審核通過並發布')
+    except Exception as e:
+        flash(f'審核失敗：{str(e)}')
+    
+    return redirect(url_for('admin_pending_books'))
+
+@app.route('/books')
+def books():
+    try:
+        logger.debug("Accessing books route")
+        books_data = supabase.table('publications').select('*').execute()
+        logger.debug(f"Retrieved {len(books_data.data)} books")
+        return render_template('books.html', books=books_data.data)
+    except Exception as e:
+        logger.error(f"Error in books route: {e}")
+        flash('獲取書籍資料時發生錯誤')
+        return redirect(url_for('index'))
+
+@app.route('/add_books', methods=['POST'])
+def add_books():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    isbns = request.form.get('isbns', '').strip().split('\n')
+    added_count = 0
+    errors = []
+    
+    print(f"收到的 ISBNs: {isbns}")  # 偵錯用
+    
+    for isbn in isbns:
+        isbn = isbn.strip()
+        if isbn:
+            try:
+                print(f"處理 ISBN: {isbn}")  # 偵錯用
+                
+                # 檢查是否已經存在
+                existing = supabase.table('pending_books')\
+                    .select('id, status')\
+                    .eq('isbn', isbn)\
+                    .eq('owner_id', session['user_id'])\
+                    .execute()
+                
+                if existing.data:
+                    print(f"ISBN {isbn} 已存在，狀態: {existing.data[0]['status']}")  # 偵錯用
+                    errors.append(f"ISBN {isbn} 已經在審核清單中")
+                    continue
+                
+                # 新增到 pending_books
+                result = supabase.table('pending_books').insert({
+                    'isbn': isbn,
+                    'owner_id': session['user_id'],
+                    'status': '待審核',
+                    'title': '處理中...'  # 添加初始標題
+                }).execute()
+                
+                print(f"新增結果: {result.data}")  # 偵錯用
+                
+                if result.data:
+                    added_count += 1
+                    # 立即處理書籍資訊
+                    if process_book_info(isbn, session['user_id']):
+                        print(f"ISBN {isbn} 資訊處理成功")  # 偵錯用
+                    else:
+                        print(f"ISBN {isbn} 資訊處理失敗")  # 偵錯用
+                        errors.append(f"ISBN {isbn} 資訊處理失敗")
+                
+            except Exception as e:
+                print(f"新增書籍失敗 ISBN {isbn}: {str(e)}")  # 偵錯用
+                errors.append(f"ISBN {isbn} 處理時發生錯誤: {str(e)}")
+                continue
+    
+    if added_count > 0:
+        flash(f"成功新增 {added_count} 本書籍，請等待審核！")
+        if errors:
+            flash("部分書籍處理失敗：" + "；".join(errors))
+    else:
+        if errors:
+            flash("新增失敗：" + "；".join(errors))
+        else:
+            flash("沒有新增任何書籍，請檢查 ISBN 格式是否正確。")
+    
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
