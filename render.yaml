@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: library-system
+    env: python
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.18 
