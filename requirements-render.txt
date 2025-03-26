@@ -1,5 +1,5 @@
 flask
-supabase-py
+supabase
 bcrypt
 qrcode
 requests<2.32.0
