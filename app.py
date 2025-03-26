@@ -198,7 +198,7 @@ def register():
                 'max_borrow': 2
             }).execute().data[0]
 
-            # 處理書籍 ISBN（使用相同的邏輯）
+            # 處理書籍 ISBN
             isbns = request.form.get('isbns', '').strip().split('\n')
             added_count = 0
             
@@ -206,12 +206,16 @@ def register():
                 isbn = isbn.strip()
                 if isbn:
                     try:
-                        supabase.table('pending_books').insert({
+                        # 新增到 pending_books 表
+                        pending_book = supabase.table('pending_books').insert({
                             'isbn': isbn,
                             'owner_id': new_user['id'],
-                            'status': '待審核'
-                        }).execute()
+                            'status': '待審核',
+                            'title': '處理中...'  # 添加初始標題
+                        }).execute().data[0]
                         added_count += 1
+                        
+                        # 立即處理書籍資訊
                         process_book_info(isbn, new_user['id'])
                     except Exception as e:
                         print(f"新增書籍失敗 ISBN {isbn}: {str(e)}")

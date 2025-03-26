@@ -3,9 +3,9 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4>
+        <h5>
             <i class="fas fa-book"></i> 可借閱書籍
-        </h4>
+        </h5>
         <div>
             <div class="btn-group me-2">
                 <button class="btn btn-outline-primary active" data-view="list">
@@ -62,11 +62,11 @@
 
     <!-- 網格狀顯示 -->
     <div id="grid-view" style="display: none;">
-        <div class="row">
+        <div class="row g-2">
             {% for book in books %}
-            <div class="col-4" style="margin-bottom: 20px;">
-                <div class="card h-100">
-                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 300px;">
+            <div class="col-4" style="margin-bottom: 10px;">
+                <div class="book-cover" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#bookModal{{ book.id }}">
+                    <div class="d-flex align-items-center justify-content-center bg-light" style="height: 200px; border-radius: 8px;">
                         {% if book.cover_url %}
                         <img src="{{ book.cover_url }}" 
                              alt="{{ book.title }}" 
@@ -76,13 +76,6 @@
                         {% else %}
                         <i class="fas fa-book fa-4x text-muted"></i>
                         {% endif %}
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">{{ book.title }}</h5>
-                        <p class="card-text">{{ book.author }}</p>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal{{ book.id }}">
-                            查看詳情
-                        </button>
                     </div>
                 </div>
             </div>
@@ -292,19 +285,15 @@
         font-size: 0.75rem;
     }
 }
-#grid-view .card {
-    margin-bottom: 0;
-    height: 100%;
+/* 網格視圖專用樣式 */
+#grid-view .book-cover {
+    transition: transform 0.2s;
 }
-#grid-view .card-img-top {
-    height: 300px;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+#grid-view .book-cover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
-#grid-view .card-img-top img {
+#grid-view img {
     max-height: 100%;
     width: auto;
     object-fit: contain;
@@ -313,20 +302,7 @@
     #grid-view .col-4 {
         flex: 0 0 33.333333%;
         max-width: 33.333333%;
-        padding: 5px;
-    }
-    #grid-view .card-body {
-        padding: 10px;
-    }
-    #grid-view .card-title {
-        font-size: 12px;
-    }
-    #grid-view .card-text {
-        font-size: 10px;
-    }
-    #grid-view .btn {
-        font-size: 12px;
-        padding: 4px 8px;
+        padding: 2px;
     }
 }
 </style>
