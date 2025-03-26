@@ -11,16 +11,24 @@ import time
 import logging
 from bs4 import BeautifulSoup
 import re
+from dotenv import load_dotenv
+
+# 載入環境變數
+load_dotenv()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
-supabase_url = "https://uidcuqimzkzvoscqhyax.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZGN1cWltemt6dm9zY3FoeWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Mzg1OTcsImV4cCI6MjA1NjIxNDU5N30.e3U8j15-VB7fQhSG1VQk99tB8PuV-VjETHFXcvNlMBo"
+# 從環境變數獲取Supabase認證信息
+supabase_url = os.environ.get('SUPABASE_URL')
+supabase_key = os.environ.get('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
+
+# 管理員密碼也從環境變數獲取
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '1576')  # 預設密碼僅用於開發環境
 
 def admin_required(f):
     @wraps(f)
@@ -41,7 +49,7 @@ def index():
         return redirect(url_for('login'))
     
     books = supabase.table('publications')\
-        .select('id, title, description, product_link, status, isbn')\
+        .select('id, title, description, product_link, status, isbn, cover_url')\
         .eq('status', '可借閱')\
         .execute().data
     
@@ -61,39 +69,45 @@ def index():
 def process_book_info(isbn, owner_id):
     """立即處理書籍資訊"""
     try:
-        print(f"開始處理 ISBN {isbn} 的資訊")
-        
-        # 使用博客來爬蟲
+        # 爬取書籍資訊
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Referer": "https://www.books.com.tw/",
+            "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive"
         }
         
         # 1. 搜尋頁面
         search_url = f"https://search.books.com.tw/search/query/key/{isbn}/cat/all"
+        print(f"訪問搜尋頁面: {search_url}")  # 除錯訊息
         search_response = requests.get(search_url, headers=headers, timeout=10)
         if search_response.status_code != 200:
-            print(f"搜尋頁面返回狀態碼: {search_response.status_code}")
+            print(f"搜尋頁面返回狀態碼: {search_response.status_code}")  # 除錯訊息
             return False
             
         search_soup = BeautifulSoup(search_response.text, 'html.parser')
         product_link = search_soup.select_one('a[href*="/redirect/move/"]')
         if not product_link:
-            print("找不到商品連結")
+            print("找不到商品連結")  # 除錯訊息
             return False
             
         # 2. 取得商品頁面
         item_id = product_link['href'].split('item/')[1].split('/')[0]
         product_url = f"https://www.books.com.tw/products/{item_id}"
+        print(f"訪問商品頁面: {product_url}")  # 除錯訊息
         
         response = requests.get(product_url, headers=headers, timeout=10)
         if response.status_code != 200:
-            print(f"商品頁面返回狀態碼: {response.status_code}")
+            print(f"商品頁面返回狀態碼: {response.status_code}")  # 除錯訊息
             return False
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # 3. 提取資訊
         title = soup.select_one('h1').text.strip()
+        print(f"找到書名: {title}")  # 除錯訊息
         
         author_elem = soup.select_one('.type02_p003 li')
         author = '未知作者'
@@ -102,51 +116,49 @@ def process_book_info(isbn, owner_id):
             match = re.search(r'作者：\s*([^\s]+)', author_text)
             if match:
                 author = match.group(1)
+        print(f"找到作者: {author}")  # 除錯訊息
                 
         description = soup.select_one('.content')
         description = description.text.strip() if description else '無描述'
+        print(f"找到描述，長度: {len(description)}")  # 除錯訊息
         
         # 4. 處理書封
-        cover_path = None
+        cover_url = None
         cover_elem = soup.select_one('img.cover')
         if cover_elem and 'src' in cover_elem.attrs:
             cover_url = cover_elem['src']
+            print(f"原始書封 URL: {cover_url}")  # 除錯訊息
             if not cover_url.startswith('http'):
                 cover_url = "https:" + cover_url
-            print(f"下載書封: {cover_url}")
-                
-            img_response = requests.get(cover_url, headers=headers, timeout=10)
-            if img_response.status_code == 200:
-                cover_path = f"/covers/{isbn}.jpg"
-                local_cover_path = os.path.join('static', 'covers', f"{isbn}.jpg")
-                print(f"儲存書封到: {local_cover_path}")
-                with open(local_cover_path, 'wb') as f:
-                    f.write(img_response.content)
-                print("書封儲存成功")
+            print(f"處理後書封 URL: {cover_url}")  # 除錯訊息
+        else:
+            print("找不到書封元素或 src 屬性")  # 除錯訊息
         
         # 5. 更新資料庫
+        print("更新資料庫")  # 除錯訊息
         update_data = {
             'title': title,
             'author': author,
             'description': description,
             'product_link': product_url,
-            'cover_url': cover_path,
+            'cover_url': cover_url,  # 直接使用博客來的圖片 URL
             'error_message': None
         }
+        print(f"要更新的資料: {update_data}")  # 除錯訊息
         
         result = supabase.table('pending_books')\
             .update(update_data)\
             .eq('isbn', isbn)\
             .eq('owner_id', owner_id)\
             .execute()
-        
-        print(f"更新結果: {result.data}")
+            
+        print(f"更新結果: {result.data}")  # 除錯訊息
         return True
         
     except Exception as e:
-        print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")
+        print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")  # 除錯訊息
         supabase.table('pending_books').update({
-            'error_message': '無法從博客來找到此書籍'
+            'error_message': f'處理失敗: {str(e)}'
         }).eq('isbn', isbn).eq('owner_id', owner_id).execute()
         return False
 
@@ -163,14 +175,25 @@ def register():
             return redirect(url_for('register'))
         
         try:
+            # 獲取當前最大的書袋編號
+            result = supabase.table('users').select('bag_id').order('bag_id', desc=True).limit(1).execute()
+            current_max = 0
+            if result.data:
+                # 從 "BAG1" 格式中提取數字
+                match = re.search(r'BAG(\d+)', result.data[0]['bag_id'])
+                if match:
+                    current_max = int(match.group(1))
+            
+            # 生成新的書袋編號
+            new_bag_id = f"BAG{current_max + 1}"
+            
             # 建立新用戶
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-            bag_id = f"BAG_{phone}_{os.urandom(4).hex()}"
             new_user = supabase.table('users').insert({
                 'phone': phone,
                 'password': hashed_password.decode('utf-8'),
                 'name': name,
-                'bag_id': bag_id,
+                'bag_id': new_bag_id,
                 'status': '待審核',
                 'max_borrow': 2
             }).execute().data[0]
@@ -243,13 +266,13 @@ def admin_login():
     if session.get('qr_mode'):
         return redirect(url_for('borrow_checkin', bag_id=session.get('bag_id')))
     if 'admin' in session:
-        return redirect(url_for('admin_review'))
+        return redirect(url_for('admin_reservations'))
         
     if request.method == 'POST':
         password = request.form['password']
-        if password == "1576":
+        if password == ADMIN_PASSWORD:
             session['admin'] = True
-            return redirect(url_for('admin_review'))
+            return redirect(url_for('admin_reservations'))
         flash("管理員密碼錯誤！")
     return render_template('admin_login.html')
 
@@ -288,19 +311,34 @@ def admin_review():
 @app.route('/admin/book_status')
 @admin_required
 def admin_book_status():
-    # 修正查詢，移除 created_at 排序
-    books = supabase.table('publications')\
+    # 獲取排序參數
+    sort_by = request.args.get('sort', 'title')
+    order = request.args.get('order', 'asc')
+    
+    # 建立基本查詢
+    query = supabase.table('publications')\
         .select('''
             *,
             owner:users!publications_owner_id_fkey (
                 name,
                 phone
             )
-        ''')\
-        .execute().data
-
+        ''')
+    
+    # 根據排序參數添加排序
+    if sort_by == 'title':
+        query = query.order('title', desc=(order == 'desc'))
+    elif sort_by == 'owner':
+        query = query.order('owner(name)', desc=(order == 'desc'))
+    elif sort_by == 'status':
+        query = query.order('status', desc=(order == 'desc'))
+    
+    # 執行查詢
+    books = query.execute().data
+    
+    # 獲取借閱資訊
     for book in books:
-        # 獲取最新的未完成預約/借閱記錄，移除 order by created_at
+        # 獲取最新的未完成預約/借閱記錄
         reservation = supabase.table('reservations')\
             .select('''
                 *,
@@ -334,7 +372,11 @@ def admin_book_status():
             book['borrower_name'] = reservation['borrower']['name']
             book['borrower_phone'] = reservation['borrower']['phone']
 
-    return render_template('admin_book_status.html', books=books)
+    # 如果是按借閱者排序，在 Python 中進行排序
+    if sort_by == 'borrower':
+        books.sort(key=lambda x: (x['borrower_name'] == '-', x['borrower_name']), reverse=(order == 'desc'))
+
+    return render_template('admin_book_status.html', books=books, sort=sort_by, order=order)
 
 @app.route('/admin/reservations', methods=['GET', 'POST'])
 @admin_required
@@ -461,22 +503,31 @@ def borrow_checkin(bag_id):
             flash("已確認還書，書籍已重新上架！")
         return redirect(url_for('index'))
 
-    # 獲取書籍資訊
+    # 獲取待取書的書籍
     pending_books = supabase.table('reservations')\
         .select('publication_id, publications(title)')\
         .eq('user_id', user_id)\
         .eq('status', '已準備')\
         .execute().data
 
+    # 獲取已取書的書籍
     borrowed_books = supabase.table('reservations')\
         .select('publication_id, publications(title)')\
         .eq('user_id', user_id)\
         .eq('status', '已取書')\
         .execute().data
 
+    # 移除重複的書籍
+    seen_books = set()
+    unique_borrowed_books = []
+    for book in borrowed_books:
+        if book['publication_id'] not in seen_books:
+            seen_books.add(book['publication_id'])
+            unique_borrowed_books.append(book)
+
     return render_template('borrow_checkin.html', 
                          pending_books=pending_books, 
-                         borrowed_books=borrowed_books,
+                         borrowed_books=unique_borrowed_books,
                          bag_id=bag_id)
 
 @app.route('/exit_qr_mode')
@@ -697,6 +748,28 @@ def add_books():
             flash("沒有新增任何書籍，請檢查 ISBN 格式是否正確。")
     
     return redirect(url_for('index'))
+
+@app.context_processor
+def inject_pending_counts():
+    if 'admin' in session:
+        pending_users = supabase.table('users').select('id').eq('status', '待審核').execute().data
+        pending_books = supabase.table('pending_books').select('id').eq('status', '待審核').execute().data
+        pending_reservations = supabase.table('reservations').select('id').eq('status', '待處理').execute().data
+        return {
+            'pending_users': pending_users,
+            'pending_books': pending_books,
+            'pending_reservations': pending_reservations
+        }
+    return {
+        'pending_users': [],
+        'pending_books': [],
+        'pending_reservations': []
+    }
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.clear()
+    return redirect(url_for('admin_login'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)

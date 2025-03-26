@@ -1,57 +1,88 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>書籍狀態列表</h2>
+<h2 class="mb-4">書籍狀態</h2>
 
-<table class="table table-responsive-card">
-    <thead>
-        <tr>
-            <th>書名</th>
-            <th>擁有者</th>
-            <th>目前狀態</th>
-            <th>借閱者</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for book in books %}
-        <tr>
-            <td data-label="書名">{{ book.title }}</td>
-            <td data-label="擁有者">
-                {{ book.owner.name }}<br>
-                <small class="text-muted">{{ book.owner.phone }}</small>
-            </td>
-            <td data-label="目前狀態">
-                <span class="badge badge-{{ 
-                    'success' if book.current_status == '可借閱' 
-                    else 'warning' if book.current_status in ['待處理', '已準備']
-                    else 'info' if book.current_status == '已取書'
-                    else 'secondary' 
-                }}">
-                    {{ book.current_status }}
-                </span><br>
-                <small class="text-muted">{{ book.status_description }}</small>
-            </td>
-            <td data-label="借閱者">
-                {% if book.borrower_name != '-' %}
-                    {{ book.borrower_name }}<br>
-                    <small class="text-muted">{{ book.borrower_phone }}</small>
-                {% else %}
-                    -
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>
+                            書名 
+                            <a href="{{ url_for('admin_book_status', sort='title', order='asc') }}" class="text-decoration-none" title="升冪排序">
+                                <i class="fas fa-arrow-up"></i>
+                            </a>
+                            <a href="{{ url_for('admin_book_status', sort='title', order='desc') }}" class="text-decoration-none" title="降冪排序">
+                                <i class="fas fa-arrow-down"></i>
+                            </a>
+                        </th>
+                        <th>作者</th>
+                        <th>
+                            擁有者 
+                            <a href="{{ url_for('admin_book_status', sort='owner', order='asc') }}" class="text-decoration-none" title="升冪排序">
+                                <i class="fas fa-arrow-up"></i>
+                            </a>
+                            <a href="{{ url_for('admin_book_status', sort='owner', order='desc') }}" class="text-decoration-none" title="降冪排序">
+                                <i class="fas fa-arrow-down"></i>
+                            </a>
+                        </th>
+                        <th>
+                            狀態 
+                            <a href="{{ url_for('admin_book_status', sort='status', order='asc') }}" class="text-decoration-none" title="升冪排序">
+                                <i class="fas fa-arrow-up"></i>
+                            </a>
+                            <a href="{{ url_for('admin_book_status', sort='status', order='desc') }}" class="text-decoration-none" title="降冪排序">
+                                <i class="fas fa-arrow-down"></i>
+                            </a>
+                        </th>
+                        <th>
+                            借閱者 
+                            <a href="{{ url_for('admin_book_status', sort='borrower', order='asc') }}" class="text-decoration-none" title="升冪排序">
+                                <i class="fas fa-arrow-up"></i>
+                            </a>
+                            <a href="{{ url_for('admin_book_status', sort='borrower', order='desc') }}" class="text-decoration-none" title="降冪排序">
+                                <i class="fas fa-arrow-down"></i>
+                            </a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in books %}
+                    <tr>
+                        <td>{{ book.title }}</td>
+                        <td>{{ book.author }}</td>
+                        <td>{{ book.owner.name }} ({{ book.owner.phone }})</td>
+                        <td>
+                            {% if book.current_status == '可借閱' %}
+                            <span class="badge bg-success">可借閱</span>
+                            {% elif book.current_status == '待處理' %}
+                            <span class="badge bg-warning">待處理</span>
+                            {% elif book.current_status == '已準備' %}
+                            <span class="badge bg-warning">已準備</span>
+                            {% elif book.current_status == '已取書' %}
+                            <span class="badge bg-info">已取書</span>
+                            {% endif %}
+                            {{ book.status_description }}
+                        </td>
+                        <td>{{ book.borrower_name }} ({{ book.borrower_phone }})</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <div class="card mt-4">
     <div class="card-body">
         <h4 class="card-title">狀態說明</h4>
         <ul class="list-unstyled mb-0">
-            <li class="mb-2"><span class="badge badge-success">可借閱</span> 在架上可借閱</li>
-            <li class="mb-2"><span class="badge badge-warning">待處理</span> 已申請借閱，待管理員放入書袋</li>
-            <li class="mb-2"><span class="badge badge-warning">已準備</span> 已放入書袋，待用戶取書</li>
-            <li class="mb-2"><span class="badge badge-info">已取書</span> 用戶已取出，待歸還</li>
+            <li class="mb-2"><span class="badge bg-success">可借閱</span> 在架上可借閱</li>
+            <li class="mb-2"><span class="badge bg-warning">待處理</span> 已申請借閱，待管理員放入書袋</li>
+            <li class="mb-2"><span class="badge bg-warning">已準備</span> 已放入書袋，待用戶取書</li>
+            <li class="mb-2"><span class="badge bg-info">已取書</span> 用戶已取出，待歸還</li>
         </ul>
     </div>
 </div>

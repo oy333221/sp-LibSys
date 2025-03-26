@@ -1,35 +1,40 @@
 {% extends "base.html" %}
 
 {% block content %}
+<h2 class="mb-4">預約管理</h2>
+
 <div class="card">
     <div class="card-body">
-        <h2 class="card-title">預約管理</h2>
+        <h4 class="card-title">待處理預約</h4>
         <div class="table-responsive">
-            <table class="table table-responsive-card">
+            <table class="table table-hover">
                 <thead>
                     <tr>
                         <th>書名</th>
-                        <th>借閱者</th>
-                        <th>聯絡電話</th>
+                        <th>預約者</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for reservation in reservations %}
                     <tr>
-                        <td data-label="書名">{{ reservation.publications.title }}</td>
-                        <td data-label="借閱者">{{ reservation.users.name }}</td>
-                        <td data-label="聯絡電話">{{ reservation.users.phone }}</td>
-                        <td data-label="操作">
-                            <form method="POST">
+                        <td>{{ reservation.publications.title }}</td>
+                        <td>{{ reservation.users.name }} ({{ reservation.users.phone }})</td>
+                        <td>
+                            <form action="{{ url_for('admin_reservations') }}" method="post" class="d-inline">
                                 <input type="hidden" name="reservation_id" value="{{ reservation.id }}">
-                                <button type="submit" class="btn btn-primary">已放入書袋</button>
+                                <button type="submit" class="btn btn-success btn-sm">
+                                    <i class="fas fa-check"></i> 已放入書袋
+                                </button>
                             </form>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            {% if not reservations %}
+            <div class="alert alert-info mt-3">目前沒有待處理的預約</div>
+            {% endif %}
         </div>
     </div>
 </div>

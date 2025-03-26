@@ -1,78 +1,80 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- 待審核用戶 -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title">待審核用戶</h3>
-                <div class="table-responsive">
-                    <table class="table table-responsive-card">
-                        <thead>
-                            <tr>
-                                <th>姓名</th>
-                                <th>電話</th>
-                                <th>書袋ID</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in pending_users %}
-                            <tr>
-                                <td data-label="姓名">{{ user.name }}</td>
-                                <td data-label="電話">{{ user.phone }}</td>
-                                <td data-label="書袋ID">{{ user.bag_id }}</td>
-                                <td data-label="操作">
-                                    <form method="POST" class="d-inline">
-                                        <input type="hidden" name="user_id" value="{{ user.id }}">
-                                        <button type="submit" name="action" value="approved" class="btn btn-success btn-sm">通過</button>
-                                        <button type="submit" name="action" value="rejected" class="btn btn-danger btn-sm">拒絕</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<h2 class="mb-4">審核管理</h2>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h4 class="card-title">待審核用戶</h4>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>姓名</th>
+                        <th>手機號碼</th>
+                        <th>書袋編號</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in pending_users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.phone }}</td>
+                        <td>{{ user.bag_id }}</td>
+                        <td>
+                            <form action="{{ url_for('admin_review') }}" method="post" class="d-inline">
+                                <input type="hidden" name="user_id" value="{{ user.id }}">
+                                <button type="submit" name="action" value="approved" class="btn btn-success btn-sm">
+                                    <i class="fas fa-check"></i> 通過
+                                </button>
+                                <button type="submit" name="action" value="rejected" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-times"></i> 拒絕
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <!-- 待審核書籍 -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title">待審核書籍</h3>
-                <div class="table-responsive">
-                    <table class="table table-responsive-card">
-                        <thead>
-                            <tr>
-                                <th>ISBN</th>
-                                <th>書名</th>
-                                <th>擁有者ID</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for book in pending_books %}
-                            <tr>
-                                <td data-label="ISBN">{{ book.isbn }}</td>
-                                <td data-label="書名">{{ book.title }}</td>
-                                <td data-label="擁有者ID">{{ book.owner_id }}</td>
-                                <td data-label="操作">
-                                    <form method="POST" class="d-inline">
-                                        <input type="hidden" name="book_id" value="{{ book.id }}">
-                                        <button type="submit" name="action" value="approved" class="btn btn-success btn-sm">通過</button>
-                                        <button type="submit" name="action" value="rejected" class="btn btn-danger btn-sm">拒絕</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<div class="card">
+    <div class="card-body">
+        <h4 class="card-title">待審核書籍</h4>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ISBN</th>
+                        <th>書名</th>
+                        <th>作者</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in pending_books %}
+                    <tr>
+                        <td>{{ book.isbn }}</td>
+                        <td>{{ book.title }}</td>
+                        <td>{{ book.author }}</td>
+                        <td>
+                            <form action="{{ url_for('admin_review') }}" method="post" class="d-inline">
+                                <input type="hidden" name="book_id" value="{{ book.id }}">
+                                <button type="submit" name="action" value="approved" class="btn btn-success btn-sm">
+                                    <i class="fas fa-check"></i> 通過
+                                </button>
+                                <button type="submit" name="action" value="rejected" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-times"></i> 拒絕
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

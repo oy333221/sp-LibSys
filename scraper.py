@@ -30,7 +30,12 @@ def is_valid_isbn(isbn):
 def process_book(isbn):
     print(f"開始從博客來爬取 ISBN: {isbn}")  # 除錯訊息
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Referer": "https://www.books.com.tw/",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive"
     }
     
     try:
@@ -78,38 +83,76 @@ def process_book(isbn):
         print(f"找到描述，長度: {len(description)}")  # 除錯訊息
         
         # 4. 處理書封
-        cover_path = None
+        cover_url = None
         cover_elem = soup.select_one('img.cover')
         if cover_elem and 'src' in cover_elem.attrs:
             cover_url = cover_elem['src']
             if not cover_url.startswith('http'):
                 cover_url = "https:" + cover_url
-            print(f"下載書封: {cover_url}")  # 除錯訊息
-                
-            img_response = requests.get(cover_url, headers=headers, timeout=10)
-            if img_response.status_code == 200:
-                cover_path = f"/covers/{isbn}.jpg"
-                with open(os.path.join(STATIC_DIR, f"{isbn}.jpg"), 'wb') as f:
-                    f.write(img_response.content)
-                print("書封下載成功")  # 除錯訊息
+            print(f"找到書封 URL: {cover_url}")  # 除錯訊息
         
         # 5. 更新資料庫
         print("更新資料庫")  # 除錯訊息
-        supabase.table('pending_books').update({
+        update_data = {
             'title': title,
             'author': author,
             'description': description,
             'product_link': product_url,
-            'cover_url': cover_path,
+            'cover_url': cover_url,  # 直接使用博客來的圖片 URL
             'error_message': None
-        }).eq('isbn', isbn).execute()
+        }
         
-        print(f"成功處理 ISBN {isbn} 的資訊")  # 除錯訊息
+        result = supabase.table('pending_books')\
+            .update(update_data)\
+            .eq('isbn', isbn)\
+            .execute()
+            
+        print(f"更新結果: {result.data}")  # 除錯訊息
         return True
         
     except Exception as e:
         print(f"處理 ISBN {isbn} 時發生錯誤: {str(e)}")  # 除錯訊息
+        supabase.table('pending_books').update({
+            'error_message': f'處理失敗: {str(e)}'
+        }).eq('isbn', isbn).execute()
         return None
+
+def update_pending_book(isbn, owner_id):
+    """更新待審核書籍資訊"""
+    try:
+        # 爬取書籍資訊
+        book_info = crawl_book_info(isbn)
+        if not book_info:
+            return False
+            
+        # 直接使用博客來的圖片 URL
+        cover_url = book_info.get('cover_url')
+        
+        # 更新資料庫
+        update_data = {
+            'title': book_info['title'],
+            'author': book_info['author'],
+            'description': book_info['description'],
+            'product_link': book_info['product_link'],
+            'cover_url': cover_url,  # 直接使用博客來的圖片 URL
+            'error_message': None
+        }
+        
+        result = supabase.table('pending_books')\
+            .update(update_data)\
+            .eq('isbn', isbn)\
+            .eq('owner_id', owner_id)\
+            .execute()
+            
+        print(f"更新結果: {result.data}")
+        return True
+        
+    except Exception as e:
+        print(f"更新書籍資訊時發生錯誤: {str(e)}")
+        supabase.table('pending_books').update({
+            'error_message': f'處理失敗: {str(e)}'
+        }).eq('isbn', isbn).eq('owner_id', owner_id).execute()
+        return False
 
 def main():
     print("啟動博客來爬蟲程式")  # 除錯訊息

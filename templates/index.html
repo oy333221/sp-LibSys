@@ -3,45 +3,56 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>可借閱書籍</h2>
+        <h4>
+            <i class="fas fa-book"></i> 可借閱書籍
+        </h4>
         <div>
-            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addBookModal">
-                <i class="fas fa-plus"></i> 新增書籍
-            </button>
-            <button class="btn btn-outline-secondary" onclick="toggleView()">
-                <i class="fas fa-th-large"></i> 切換檢視
+            <div class="btn-group me-2">
+                <button class="btn btn-outline-primary active" data-view="list">
+                    <i class="fas fa-list"></i> 列表
+                </button>
+                <button class="btn btn-outline-primary" data-view="grid">
+                    <i class="fas fa-th"></i> 網格
+                </button>
+            </div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookModal">
+                <i class="fas fa-plus"></i> 我也想提供書籍
             </button>
         </div>
     </div>
 
-    <!-- 卡片檢視 -->
-    <div id="cardView" class="row g-4">
+    <!-- 列表視圖 -->
+    <div id="list-view">
         {% for book in books %}
-        <div class="col-4">
-            <div class="card h-100">
-                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                    {% if book.isbn %}
-                    <img src="{{ url_for('static', filename='covers/' + book.isbn + '.jpg') }}" 
-                         alt="{{ book.title }}" 
-                         class="img-fluid" 
-                         style="max-height: 100%; width: auto; object-fit: contain;"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}'">
-                    {% else %}
-                    <i class="fas fa-book fa-4x text-muted"></i>
-                    {% endif %}
+        <div class="card mb-3">
+            <div class="row g-0">
+                <div class="col-md-3">
+                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                        {% if book.cover_url %}
+                        <img src="{{ book.cover_url }}" 
+                             alt="{{ book.title }}" 
+                             class="img-fluid" 
+                             style="max-height: 100%; width: auto; object-fit: contain;"
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}'">
+                        {% else %}
+                        <i class="fas fa-book fa-4x text-muted"></i>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <h6 class="card-title mb-2">{{ book.title }}</h6>
-                    <p class="card-text text-muted small">{{ book.description[:100] }}{% if book.description|length > 100 %}...{% endif %}</p>
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
-                        <a href="{{ book.product_link }}" target="_blank" class="text-primary text-decoration-none small">
-                            <i class="fas fa-external-link-alt"></i> 查看詳情
-                        </a>
-                        <form action="{{ url_for('borrow', book_id=book.id) }}" method="post" class="w-100 w-md-auto">
-                            <button type="submit" class="btn btn-primary btn-sm w-100">
-                                <i class="fas fa-book"></i> 借閱
-                            </button>
-                        </form>
+                <div class="col-md-9">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ book.title }}</h5>
+                        <p class="card-text">{{ book.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{{ book.product_link }}" target="_blank" class="text-primary text-decoration-none">
+                                <i class="fas fa-external-link-alt"></i> 查看詳情
+                            </a>
+                            <form action="/borrow/{{ book.id }}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-book"></i> 借閱
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -49,38 +60,73 @@
         {% endfor %}
     </div>
 
-    <!-- 表格檢視 -->
-    <div id="tableView" class="table-responsive" style="display: none;">
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>書名</th>
-                    <th>描述</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for book in books %}
-                <tr>
-                    <td>{{ book.title }}</td>
-                    <td>{{ book.description[:100] }}{% if book.description|length > 100 %}...{% endif %}</td>
-                    <td>
-                        <div class="d-flex flex-column flex-md-row gap-2">
-                            <a href="{{ book.product_link }}" target="_blank" class="text-primary text-decoration-none small">
-                                <i class="fas fa-external-link-alt"></i> 查看詳情
-                            </a>
-                            <form action="{{ url_for('borrow', book_id=book.id) }}" method="post" class="d-inline">
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-book"></i> 借閱
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- 網格狀顯示 -->
+    <div id="grid-view" style="display: none;">
+        <div class="row">
+            {% for book in books %}
+            <div class="col-4" style="margin-bottom: 20px;">
+                <div class="card h-100">
+                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 300px;">
+                        {% if book.cover_url %}
+                        <img src="{{ book.cover_url }}" 
+                             alt="{{ book.title }}" 
+                             class="img-fluid" 
+                             style="max-height: 100%; width: auto; object-fit: contain;"
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}'">
+                        {% else %}
+                        <i class="fas fa-book fa-4x text-muted"></i>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ book.title }}</h5>
+                        <p class="card-text">{{ book.author }}</p>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal{{ book.id }}">
+                            查看詳情
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
+
+    <!-- 書籍詳情 Modal -->
+    {% for book in books %}
+    <div class="modal fade" id="bookModal{{ book.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ book.title }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        {% if book.cover_url %}
+                        <img src="{{ book.cover_url }}" 
+                             alt="{{ book.title }}" 
+                             class="img-fluid" 
+                             style="max-height: 300px; width: auto; object-fit: contain;"
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default-book.png') }}'">
+                        {% else %}
+                        <i class="fas fa-book fa-4x text-muted"></i>
+                        {% endif %}
+                    </div>
+                    <p class="card-text">{{ book.description }}</p>
+                    <div class="d-grid gap-2 py-2">
+                        <a href="{{ book.product_link }}" target="_blank" class="text-primary text-decoration-none">
+                            <i class="fas fa-external-link-alt"></i> 查看詳情
+                        </a>
+                        <form action="/borrow/{{ book.id }}" method="post">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-book"></i> 借閱
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 
     <!-- 預約中的書籍 -->
     {% if reservations %}
@@ -123,14 +169,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('add_books') }}" method="post">
-                    <div class="mb-3">
-                        <label for="isbns" class="form-label">請輸入書籍 ISBN（每行一個）</label>
-                        <textarea class="form-control" id="isbns" name="isbns" rows="5" required></textarea>
+                <form action="/add_books" method="post" class="mb-4" id="addBooksForm">
+                    <div class="input-group">
+                        <textarea name="isbns" class="form-control" rows="3" placeholder="請輸入書籍 ISBN，每行一本"></textarea>
+                        <button type="submit" class="btn btn-primary" id="addBooksBtn">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            <i class="fas fa-plus"></i> 我也想提供書籍
+                        </button>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> 新增
-                    </button>
                 </form>
             </div>
         </div>
@@ -138,21 +184,32 @@
 </div>
 
 <script>
-function toggleView() {
-    const cardView = document.getElementById('cardView');
-    const tableView = document.getElementById('tableView');
-    const toggleBtn = document.querySelector('.btn-outline-secondary');
-    
-    if (cardView.style.display !== 'none') {
-        cardView.style.display = 'none';
-        tableView.style.display = 'block';
-        toggleBtn.innerHTML = '<i class="fas fa-th"></i> 切換檢視';
-    } else {
-        cardView.style.display = 'flex';
-        tableView.style.display = 'none';
-        toggleBtn.innerHTML = '<i class="fas fa-th-large"></i> 切換檢視';
-    }
-}
+    // 視圖切換
+    document.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.dataset.view;
+            document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
+            document.getElementById('grid-view').style.display = view === 'grid' ? 'block' : 'none';
+            document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // 只為借閱按鈕添加 loading 狀態
+    document.querySelectorAll('form[action^="/borrow/"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const btn = this.querySelector('button[type="submit"]');
+            if (btn) {
+                const spinner = document.createElement('span');
+                spinner.className = 'spinner-border spinner-border-sm ms-2';
+                spinner.setAttribute('role', 'status');
+                spinner.setAttribute('aria-hidden', 'true');
+                
+                btn.disabled = true;
+                btn.appendChild(spinner);
+            }
+        });
+    });
 </script>
 
 <style>
@@ -233,6 +290,43 @@ function toggleView() {
     .btn-sm {
         padding: 0.25rem 0.5rem;
         font-size: 0.75rem;
+    }
+}
+#grid-view .card {
+    margin-bottom: 0;
+    height: 100%;
+}
+#grid-view .card-img-top {
+    height: 300px;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#grid-view .card-img-top img {
+    max-height: 100%;
+    width: auto;
+    object-fit: contain;
+}
+@media (max-width: 576px) {
+    #grid-view .col-4 {
+        flex: 0 0 33.333333%;
+        max-width: 33.333333%;
+        padding: 5px;
+    }
+    #grid-view .card-body {
+        padding: 10px;
+    }
+    #grid-view .card-title {
+        font-size: 12px;
+    }
+    #grid-view .card-text {
+        font-size: 10px;
+    }
+    #grid-view .btn {
+        font-size: 12px;
+        padding: 4px 8px;
     }
 }
 </style>
