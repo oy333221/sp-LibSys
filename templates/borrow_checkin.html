@@ -26,13 +26,13 @@
             </h2>
             <div id="timer" class="text-danger">
                 <i class="fas fa-clock mr-1"></i>
-                剩餘時間: <span id="countdown">10:00</span>
+                剩餘時間: <span id="countdown">3:00</span>
             </div>
         </div>
         
         <div class="alert alert-warning mb-4">
             <i class="fas fa-exclamation-triangle mr-2"></i>
-            請注意：此頁面將在 10 分鐘後過期，請在時限內完成操作
+            請注意：此頁面將在 3 分鐘後過期，請在時限內完成操作
         </div>
 
         {% if pending_books %}
@@ -99,42 +99,37 @@
 
 <!-- 計時器和頁面過期處理的 JavaScript -->
 <script>
-let timeLeft = 600; // 10 minutes in seconds
-const countdownElement = document.getElementById('countdown');
+    let timeLeft = 180;
+    const countdownElement = document.getElementById('countdown');
+    const timerElement = document.getElementById('timer');
 
-function updateTimer() {
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
-    countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    
-    if (timeLeft <= 0) {
-        // 儲存表單數據
-        const formData = new FormData(document.querySelector('form'));
+    function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         
-        // 顯示過期提示
-        alert('頁面已過期，請重新掃描 QR Code！');
+        if (timeLeft <= 0) {
+            window.location.href = "{{ url_for('qr_login', bag_id=session.get('bag_id', '')) }}";
+            return;
+        }
         
-        // 重新載入頁面（會觸發重新認證）
-        window.location.reload();
-    } else {
         timeLeft--;
+        setTimeout(updateTimer, 1000);
     }
-}
 
-// 每秒更新計時器
-setInterval(updateTimer, 1000);
+    updateTimer();
 
-// 監聽頁面可見性變化
-document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') {
-        // 當頁面重新變為可見時，檢查是否需要重新認證
-        fetch(window.location.href, { method: 'HEAD' })
-            .then(response => {
-                if (response.status === 401) {
-                    window.location.reload();
-                }
-            });
-    }
-});
+    // 監聽頁面可見性變化
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            // 當頁面重新變為可見時，檢查是否需要重新認證
+            fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.reload();
+                    }
+                });
+        }
+    });
 </script>
 {% endblock %}

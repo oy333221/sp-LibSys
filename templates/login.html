@@ -1,38 +1,68 @@
 {% extends "base.html" %}
 
 {% block navbar %}
-{% if session.get('qr_mode') %}
-<nav class="navbar navbar-expand-lg navbar-light">
+<nav class="navbar navbar-expand-lg navbar-light bg-warning">
     <div class="container">
-        <span class="navbar-brand">書籍借還系統</span>
+        <span class="navbar-brand">
+            <i class="fas fa-qrcode mr-2"></i>QR Code 借還書系統
+        </span>
+        {% if session.get('qr_mode') %}
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <a class="nav-link text-danger" href="{{ url_for('exit_qr_mode') }}">
+                    <i class="fas fa-times mr-1"></i>退出 QR 模式
+                </a>
+            </li>
+        </ul>
+        {% endif %}
     </div>
 </nav>
-{% else %}
-{{ super() }}
-{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="card-title text-center mb-4">
-                    <i class="fas fa-sign-in-alt mr-2"></i>使用者登入
-                </h2>
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="phone">手機號碼</label>
-                        <input type="tel" class="form-control" id="phone" name="phone" required>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">
+                        {% if session.get('qr_mode') %}
+                        <i class="fas fa-qrcode mr-2"></i>QR Code 登入
+                        {% else %}
+                        <i class="fas fa-sign-in-alt mr-2"></i>登入
+                        {% endif %}
+                    </h2>
+
+                    {% if session.get('qr_mode') %}
+                    <div class="alert alert-warning mb-4">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        如果這不是您的書袋，請點擊上方的「退出 QR 模式」按鈕
                     </div>
-                    <div class="form-group">
-                        <label for="password">密碼</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                    {% endif %}
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">手機號碼</label>
+                            <input type="text" class="form-control" id="phone" name="phone" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密碼</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt mr-2"></i>登入
+                            </button>
+                            {% if session.get('qr_mode') %}
+                            <a href="{{ url_for('exit_qr_mode') }}" class="btn btn-outline-danger">
+                                <i class="fas fa-times mr-2"></i>退出 QR 模式
+                            </a>
+                            {% endif %}
+                        </div>
+                    </form>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('register') }}">還沒有帳號？立即註冊</a>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">登入</button>
-                </form>
-                <div class="text-center mt-3">
-                    <a href="{{ url_for('register') }}">還沒有帳號？立即註冊</a>
                 </div>
             </div>
         </div>

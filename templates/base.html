@@ -46,6 +46,9 @@
                                 <a class="nav-link" href="{{ url_for('admin_book_status') }}">書籍狀態</a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin_reservation_history') }}">借閱歷史</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('admin_review') }}">
                                     審核
                                     {% if pending_users|length > 0 or pending_books|length > 0 %}

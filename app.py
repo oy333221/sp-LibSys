@@ -6,7 +6,7 @@ from io import BytesIO
 import os
 from functools import wraps
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import logging
 from bs4 import BeautifulSoup
@@ -426,11 +426,22 @@ def borrow(book_id):
     if len(current_borrowed) >= user['max_borrow']:
         flash("您已達借書上限！")
         return redirect(url_for('index'))
-    supabase.table('reservations').insert({
+    
+    # 創建預約記錄
+    reservation = supabase.table('reservations').insert({
         'user_id': session['user_id'],
         'publication_id': book_id,
         'status': '待處理'
+    }).execute().data[0]
+    
+    # 添加歷史記錄
+    supabase.table('reservation_history').insert({
+        'reservation_id': reservation['id'],
+        'publication_id': book_id,
+        'user_id': session['user_id'],
+        'action': '預約'
     }).execute()
+    
     supabase.table('publications').update({'status': '已借出'}).eq('id', book_id).execute()
     flash("預約成功，請等待管理員放入書袋！")
     return redirect(url_for('index'))
@@ -439,27 +450,37 @@ def borrow(book_id):
 def cancel_borrow(reservation_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    reservation = supabase.table('reservations').select('publication_id').eq('id', reservation_id).eq('user_id', session['user_id']).execute().data
+    reservation = supabase.table('reservations').select('publication_id, status').eq('id', reservation_id).eq('user_id', session['user_id']).execute().data
     if reservation:
-        supabase.table('reservations').update({'status': '已取消'}).eq('id', reservation_id).execute()
-        supabase.table('publications').update({'status': '可借閱'}).eq('id', reservation[0]['publication_id']).execute()
-        flash("已取消預約！")
+        if reservation[0]['status'] == '待處理':
+            # 添加歷史記錄
+            supabase.table('reservation_history').insert({
+                'reservation_id': reservation_id,
+                'publication_id': reservation[0]['publication_id'],
+                'user_id': session['user_id'],
+                'action': '取消預約'
+            }).execute()
+            
+            supabase.table('reservations').update({'status': '已取消'}).eq('id', reservation_id).execute()
+            supabase.table('publications').update({'status': '可借閱'}).eq('id', reservation[0]['publication_id']).execute()
+            flash("已取消預約！")
+        else:
+            flash("此預約無法取消，因為書籍已經被放入書袋或已被取走。")
     return redirect(url_for('index'))
 
 @app.route('/borrow_checkin/<bag_id>', methods=['GET', 'POST'])
 def borrow_checkin(bag_id):
+    # 檢查時間戳
+    if 'qr_timestamp' in session:
+        elapsed_time = time.time() - session['qr_timestamp']
+        if elapsed_time > 180:
+            session.clear()
+            return render_template('qr_expired.html')
+    
     # 設置 QR code 模式
     session['qr_mode'] = True
     session['bag_id'] = bag_id
     session['qr_timestamp'] = time.time()
-    
-    # 檢查時間戳
-    if 'qr_timestamp' in session:
-        elapsed_time = time.time() - session['qr_timestamp']
-        if elapsed_time > 600:
-            session.pop('user_id', None)
-            flash('操作時間已過期，請重新掃描 QR Code！')
-            return redirect(url_for('login'))
 
     # 檢查書袋是否有效
     user = supabase.table('users').select('id').eq('bag_id', bag_id).execute().data
@@ -486,24 +507,56 @@ def borrow_checkin(bag_id):
         # 再次檢查時間戳
         if 'qr_timestamp' in session:
             elapsed_time = time.time() - session['qr_timestamp']
-            if elapsed_time > 600:
-                flash('操作時間已過期，請重新掃描 QR Code！')
-                return redirect(url_for('login'))
+            if elapsed_time > 180:
+                session.clear()
+                return render_template('qr_expired.html')
         
         action = request.form.get('action')
         book_ids = request.form.getlist('book_ids')
         if action == 'borrow':
             for book_id in book_ids:
-                reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', '已準備').execute().data
+                reservation = supabase.table('reservations').select('id, status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', '已準備').execute().data
                 if reservation:
+                    # 添加歷史記錄
+                    supabase.table('reservation_history').insert({
+                        'reservation_id': reservation[0]['id'],
+                        'publication_id': book_id,
+                        'user_id': user_id,
+                        'action': '取書',
+                        'borrow_days': 0  # 初始借閱天數為0
+                    }).execute()
+                    
                     supabase.table('reservations').update({'status': '已取書'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
             flash("已確認取書，您可以帶走書籍了！")
         elif action == 'return':
             for book_id in book_ids:
-                reservation = supabase.table('reservations').select('status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', '已取書').execute().data
+                reservation = supabase.table('reservations').select('id, status').eq('user_id', user_id).eq('publication_id', book_id).eq('status', '已取書').execute().data
                 if reservation:
-                    supabase.table('reservations').update({'status': '已歸還'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
-                    supabase.table('publications').update({'status': '可借閱'}).eq('id', book_id).execute()
+                    # 計算借閱天數
+                    borrow_date_result = supabase.table('reservation_history')\
+                        .select('created_at')\
+                        .eq('reservation_id', reservation[0]['id'])\
+                        .eq('action', '取書')\
+                        .execute().data
+
+                    if borrow_date_result:
+                        borrow_date = borrow_date_result[0]['created_at']
+                        borrow_days = (datetime.now(timezone.utc) - datetime.fromisoformat(borrow_date)).days
+                        
+                        # 添加歷史記錄
+                        supabase.table('reservation_history').insert({
+                            'reservation_id': reservation[0]['id'],
+                            'publication_id': book_id,
+                            'user_id': user_id,
+                            'action': '歸還',
+                            'borrow_days': borrow_days
+                        }).execute()
+                        
+                        supabase.table('reservations').update({'status': '已歸還'}).eq('user_id', user_id).eq('publication_id', book_id).execute()
+                        supabase.table('publications').update({'status': '可借閱'}).eq('id', book_id).execute()
+                    else:
+                        flash("無法找到借閱日期，請檢查記錄。")
+                        continue
             flash("已確認還書，書籍已重新上架！")
         return redirect(url_for('index'))
 
@@ -536,8 +589,13 @@ def borrow_checkin(bag_id):
 
 @app.route('/exit_qr_mode')
 def exit_qr_mode():
-    session.clear()
-    return redirect(url_for('login'))
+    # 清除所有 QR code 相關的 session 數據
+    session.pop('qr_mode', None)
+    session.pop('bag_id', None)
+    session.pop('qr_timestamp', None)
+    session.pop('qr_user_id', None)
+    flash("已退出 QR 模式")
+    return redirect(url_for('index'))
 
 @app.before_request
 def check_qr_mode():
@@ -555,9 +613,17 @@ def add_header(response):
 def qr_system(bag_id):
     # 重置所有 session，確保是全新的 QR code 操作
     session.clear()
+    
+    # 檢查書袋是否存在
+    bag_user = supabase.table('users').select('id, phone').eq('bag_id', bag_id).execute().data
+    if not bag_user:
+        return render_template('qr_error.html', message="無效的書袋！")
+    
+    # 設置新的 QR code 模式
     session['qr_mode'] = True
     session['bag_id'] = bag_id
     session['qr_timestamp'] = time.time()
+    
     return redirect(url_for('qr_login', bag_id=bag_id))
 
 @app.route('/qr/login/<bag_id>', methods=['GET', 'POST'])
@@ -601,21 +667,15 @@ def qr_login(bag_id):
 
 @app.route('/qr/borrow-return/<bag_id>', methods=['GET', 'POST'])
 def qr_borrow_return(bag_id):
-    # 嚴格檢查 QR 模式的 session
-    if not all(key in session for key in ['qr_mode', 'qr_user_id', 'qr_timestamp', 'bag_id']):
-        return redirect(url_for('qr_login', bag_id=bag_id))
+    if 'qr_timestamp' not in session or time.time() - session['qr_timestamp'] > 180:
+        session.clear()
+        return render_template('qr_expired.html')
     
     # 檢查是否是正確的書袋
     if session['bag_id'] != bag_id:
         session.clear()
         return redirect(url_for('qr_login', bag_id=bag_id))
     
-    # 檢查時間是否過期
-    if time.time() - session['qr_timestamp'] > 600:
-        session.clear()
-        flash('操作時間已過期，請重新掃描 QR Code！')
-        return redirect(url_for('qr_login', bag_id=bag_id))
-
     # 獲取書籍資訊
     pending_books = supabase.table('reservations')\
         .select('publication_id, publications(title)')\
@@ -774,6 +834,40 @@ def inject_pending_counts():
 def admin_logout():
     session.clear()
     return redirect(url_for('admin_login'))
+
+@app.route('/admin/reservation_history')
+@admin_required
+def admin_reservation_history():
+    # 獲取頁碼，預設為1
+    page = int(request.args.get('page', 1))
+    per_page = 50
+    
+    # 計算偏移量
+    offset = (page - 1) * per_page
+    
+    # 獲取歷史記錄
+    history = supabase.table('reservation_history')\
+        .select('''
+            *,
+            publication:publications(title),
+            user:users(name, phone)
+        ''')\
+        .order('created_at', desc=True)\
+        .range(offset, offset + per_page - 1)\
+        .execute().data
+    
+    # 獲取總記錄數
+    count = supabase.table('reservation_history')\
+        .select('id', count='exact')\
+        .execute().count
+    
+    # 計算總頁數
+    total_pages = (count + per_page - 1) // per_page
+    
+    return render_template('admin_reservation_history.html',
+                         history=history,
+                         current_page=page,
+                         total_pages=total_pages)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
